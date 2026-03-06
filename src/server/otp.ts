@@ -188,9 +188,6 @@ export const getSession = createServerFn({ method: 'GET' }).handler(
         const cookieHeader = request.headers.get('cookie');
         const session = parseSessionFromCookie(cookieHeader);
 
-        console.log('[getSession] Request cookies:', cookieHeader);
-        console.log('[getSession] Parsed session:', session);
-
         if (!session) {
             return { authenticated: false, email: null };
         }
