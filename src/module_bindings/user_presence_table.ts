@@ -11,11 +11,10 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  id: __t.u64().primaryKey(),
+  userId: __t.u64().primaryKey().name("user_id"),
+  orgId: __t.u64().name("org_id"),
   channelId: __t.u64().name("channel_id"),
-  senderId: __t.u64().name("sender_id"),
-  parentMessageId: __t.u64().name("parent_message_id"),
-  content: __t.string(),
-  createdAt: __t.u64().name("created_at"),
-  editedAt: __t.u64().name("edited_at"),
+  status: __t.string(),
+  lastSeenAt: __t.u64().name("last_seen_at"),
+  updatedAt: __t.u64().name("updated_at"),
 });

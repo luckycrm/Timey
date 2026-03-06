@@ -32,10 +32,41 @@ export const ChatMessage = __t.object("ChatMessage", {
   id: __t.u64(),
   channelId: __t.u64(),
   senderId: __t.u64(),
+  parentMessageId: __t.u64(),
   content: __t.string(),
   createdAt: __t.u64(),
+  editedAt: __t.u64(),
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
+
+export const ChatReaction = __t.object("ChatReaction", {
+  id: __t.u64(),
+  messageId: __t.u64(),
+  userId: __t.u64(),
+  emoji: __t.string(),
+  isActive: __t.bool(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type ChatReaction = __Infer<typeof ChatReaction>;
+
+export const ChatReadState = __t.object("ChatReadState", {
+  id: __t.u64(),
+  channelId: __t.u64(),
+  userId: __t.u64(),
+  lastReadAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type ChatReadState = __Infer<typeof ChatReadState>;
+
+export const ChatTyping = __t.object("ChatTyping", {
+  id: __t.u64(),
+  channelId: __t.u64(),
+  userId: __t.u64(),
+  isTyping: __t.bool(),
+  updatedAt: __t.u64(),
+});
+export type ChatTyping = __Infer<typeof ChatTyping>;
 
 export const Invite = __t.object("Invite", {
   id: __t.u64(),
@@ -81,4 +112,14 @@ export const User = __t.object("User", {
   lastLoginAt: __t.u64(),
 });
 export type User = __Infer<typeof User>;
+
+export const UserPresence = __t.object("UserPresence", {
+  userId: __t.u64(),
+  orgId: __t.u64(),
+  channelId: __t.u64(),
+  status: __t.string(),
+  lastSeenAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type UserPresence = __Infer<typeof UserPresence>;
 

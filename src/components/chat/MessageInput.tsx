@@ -15,6 +15,8 @@ interface MessageInputProps {
     disabled?: boolean;
     channelName?: string;
     onTypingChange?: (typing: boolean) => void;
+    contextHint?: string;
+    draftScope?: string;
 }
 
 const QUICK_EMOJIS = ['🔥', '👍', '✅', '🎉', '👀'];
@@ -26,13 +28,15 @@ export function MessageInput({
     disabled = false,
     channelName = 'channel',
     onTypingChange,
+    contextHint,
+    draftScope = 'main',
 }: MessageInputProps) {
     const [value, setValue] = useState('');
     const [sending, setSending] = useState(false);
 
     const draftStorageKey = useMemo(() => {
-        return channelId === null ? null : `timey-chat-draft-${String(channelId)}`;
-    }, [channelId]);
+        return channelId === null ? null : `timey-chat-draft-${String(channelId)}-${draftScope}`;
+    }, [channelId, draftScope]);
 
     useEffect(() => {
         if (draftStorageKey == null || typeof window === 'undefined') {
@@ -168,6 +172,11 @@ export function MessageInput({
                     <SendRoundedIcon sx={{ fontSize: 18 }} />
                 </IconButton>
             </Box>
+            {contextHint && (
+                <Typography variant="caption" sx={{ color: '#76829f', fontSize: '0.68rem', display: 'block', mt: 0.5 }}>
+                    {contextHint}
+                </Typography>
+            )}
             <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75, px: 0.25 }}>
                 <Typography variant="caption" sx={{ color: '#666', fontSize: '0.67rem' }}>
                     Press Enter to send, Shift+Enter for newline

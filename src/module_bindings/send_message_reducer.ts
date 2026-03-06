@@ -13,4 +13,5 @@ import {
 export default {
   channelId: __t.u64(),
   content: __t.string(),
+  parentMessageId: __t.u64(),
 };

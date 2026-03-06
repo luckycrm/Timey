@@ -12,10 +12,10 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  channelId: __t.u64().name("channel_id"),
-  senderId: __t.u64().name("sender_id"),
-  parentMessageId: __t.u64().name("parent_message_id"),
-  content: __t.string(),
+  messageId: __t.u64().name("message_id"),
+  userId: __t.u64().name("user_id"),
+  emoji: __t.string(),
+  isActive: __t.bool().name("is_active"),
   createdAt: __t.u64().name("created_at"),
-  editedAt: __t.u64().name("edited_at"),
+  updatedAt: __t.u64().name("updated_at"),
 });

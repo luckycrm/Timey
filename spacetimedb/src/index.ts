@@ -80,8 +80,53 @@ const spacetimedb = schema({
       id: t.u64().primaryKey().autoInc(),
       channel_id: t.u64().index('btree'),
       sender_id: t.u64().index('btree'),
+      parent_message_id: t.u64().index('btree'),
       content: t.string(),
       created_at: t.u64(),
+      edited_at: t.u64(),
+    }
+  ),
+  chat_reaction: table(
+    { name: 'chat_reaction', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      message_id: t.u64().index('btree'),
+      user_id: t.u64().index('btree'),
+      emoji: t.string(),
+      is_active: t.bool(),
+      created_at: t.u64(),
+      updated_at: t.u64(),
+    }
+  ),
+  chat_read_state: table(
+    { name: 'chat_read_state', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      channel_id: t.u64().index('btree'),
+      user_id: t.u64().index('btree'),
+      last_read_at: t.u64(),
+      updated_at: t.u64(),
+    }
+  ),
+  chat_typing: table(
+    { name: 'chat_typing', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      channel_id: t.u64().index('btree'),
+      user_id: t.u64().index('btree'),
+      is_typing: t.bool(),
+      updated_at: t.u64(),
+    }
+  ),
+  user_presence: table(
+    { name: 'user_presence', public: true },
+    {
+      user_id: t.u64().primaryKey(),
+      org_id: t.u64().index('btree'),
+      channel_id: t.u64().index('btree'),
+      status: t.string(), // 'online' | 'away' | 'dnd' | 'offline'
+      last_seen_at: t.u64(),
+      updated_at: t.u64(),
     }
   ),
 });
@@ -98,6 +143,57 @@ function generateToken(orgId: bigint, timestamp: bigint): string {
     hash |= 0;
   }
   return Math.abs(hash).toString(16).toUpperCase().padStart(6, '0').slice(0, 6);
+}
+
+function getUserFromSender(ctx: any) {
+  const user = ctx.db.user.identity.find(ctx.sender);
+  if (!user) throw new Error('User not found');
+  return user;
+}
+
+function isOrganizationMember(ctx: any, orgId: bigint, userId: bigint): boolean {
+  for (const m of ctx.db.organization_member.iter()) {
+    if (m.org_id === orgId && m.user_id === userId) return true;
+  }
+  return false;
+}
+
+function isChannelMember(ctx: any, channelId: bigint, userId: bigint): boolean {
+  for (const cm of ctx.db.chat_channel_member.iter()) {
+    if (cm.channel_id === channelId && cm.user_id === userId) return true;
+  }
+  return false;
+}
+
+function upsertPresence(
+  ctx: any,
+  userId: bigint,
+  orgId: bigint,
+  channelId: bigint,
+  status: string,
+  now: bigint
+) {
+  const existing = ctx.db.user_presence.user_id.find(userId);
+  if (existing) {
+    ctx.db.user_presence.user_id.update({
+      ...existing,
+      org_id: orgId,
+      channel_id: channelId,
+      status,
+      last_seen_at: now,
+      updated_at: now,
+    });
+    return;
+  }
+
+  ctx.db.user_presence.insert({
+    user_id: userId,
+    org_id: orgId,
+    channel_id: channelId,
+    status,
+    last_seen_at: now,
+    updated_at: now,
+  });
 }
 
 export const init = spacetimedb.init((_ctx) => {
@@ -117,16 +213,18 @@ export const registerUser = spacetimedb.reducer(
     const existingByIdentity = ctx.db.user.identity.find(identity);
     if (existingByIdentity) {
       ctx.db.user.id.update({ ...existingByIdentity, last_login_at: now });
+      upsertPresence(ctx, existingByIdentity.id, 0n, 0n, 'online', now);
       return;
     }
 
     const existingByEmail = ctx.db.user.email.find(email);
     if (existingByEmail) {
       ctx.db.user.id.update({ ...existingByEmail, identity, last_login_at: now });
+      upsertPresence(ctx, existingByEmail.id, 0n, 0n, 'online', now);
       return;
     }
 
-    ctx.db.user.insert({
+    const created = ctx.db.user.insert({
       id: 0n,
       identity,
       email,
@@ -134,6 +232,8 @@ export const registerUser = spacetimedb.reducer(
       created_at: now,
       last_login_at: now,
     });
+
+    upsertPresence(ctx, created.id, 0n, 0n, 'online', now);
   }
 );
 
@@ -326,8 +426,7 @@ export const createChannel = spacetimedb.reducer(
   { org_id: t.u64(), name: t.string(), type: t.string(), member_ids: t.array(t.u64()) },
   (ctx, { org_id, name, type, member_ids }) => {
     const now = BigInt(Date.now());
-    const user = ctx.db.user.identity.find(ctx.sender);
-    if (!user) throw new Error('User not found');
+    const user = getUserFromSender(ctx);
 
     // Verify the creator is a member of the org
     let isMember = false;
@@ -376,29 +475,36 @@ export const createChannel = spacetimedb.reducer(
  * Send a message to a chat channel.
  */
 export const sendMessage = spacetimedb.reducer(
-  { channel_id: t.u64(), content: t.string() },
-  (ctx, { channel_id, content }) => {
+  { channel_id: t.u64(), content: t.string(), parent_message_id: t.u64() },
+  (ctx, { channel_id, content, parent_message_id }) => {
     const now = BigInt(Date.now());
-    const user = ctx.db.user.identity.find(ctx.sender);
-    if (!user) throw new Error('User not found');
+    const user = getUserFromSender(ctx);
 
-    // Verify the user is a member of the channel
-    let isMember = false;
-    for (const cm of ctx.db.chat_channel_member.iter()) {
-      if (cm.channel_id === channel_id && cm.user_id === user.id) {
-        isMember = true;
-        break;
+    if (!isChannelMember(ctx, channel_id, user.id)) {
+      throw new Error('You are not a member of this channel');
+    }
+
+    if (content.trim().length === 0) throw new Error('Message cannot be empty');
+
+    if (parent_message_id !== 0n) {
+      const parent = ctx.db.chat_message.id.find(parent_message_id);
+      if (!parent) throw new Error('Thread parent message not found');
+      if (parent.channel_id !== channel_id) {
+        throw new Error('Thread parent must belong to the same channel');
       }
     }
-    if (!isMember) throw new Error('You are not a member of this channel');
 
     ctx.db.chat_message.insert({
       id: 0n,
       channel_id,
       sender_id: user.id,
+      parent_message_id,
       content,
       created_at: now,
+      edited_at: 0n,
     });
+
+    upsertPresence(ctx, user.id, 0n, channel_id, 'online', now);
   }
 );
 
@@ -409,8 +515,7 @@ export const addChannelMember = spacetimedb.reducer(
   { channel_id: t.u64(), user_id: t.u64() },
   (ctx, { channel_id, user_id }) => {
     const now = BigInt(Date.now());
-    const sender = ctx.db.user.identity.find(ctx.sender);
-    if (!sender) throw new Error('User not found');
+    const sender = getUserFromSender(ctx);
 
     // Find the channel
     const channel = ctx.db.chat_channel.id.find(channel_id);
@@ -441,5 +546,182 @@ export const addChannelMember = spacetimedb.reducer(
     });
 
     console.info(`User ${user_id} added to channel ${channel_id}`);
+  }
+);
+
+/**
+ * Keep user presence fresh (should be called periodically by the client).
+ */
+export const heartbeat = spacetimedb.reducer(
+  { org_id: t.u64(), channel_id: t.u64(), status: t.string() },
+  (ctx, { org_id, channel_id, status }) => {
+    const now = BigInt(Date.now());
+    const user = getUserFromSender(ctx);
+
+    const allowedStatuses = new Set(['online', 'away', 'dnd', 'offline']);
+    if (!allowedStatuses.has(status)) {
+      throw new Error('Invalid status value');
+    }
+
+    if (org_id !== 0n && !isOrganizationMember(ctx, org_id, user.id)) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    if (channel_id !== 0n && !isChannelMember(ctx, channel_id, user.id)) {
+      throw new Error('You are not a member of this channel');
+    }
+
+    upsertPresence(ctx, user.id, org_id, channel_id, status, now);
+  }
+);
+
+/**
+ * Mark the active typing state for a user in a channel.
+ */
+export const setTyping = spacetimedb.reducer(
+  { channel_id: t.u64(), is_typing: t.bool() },
+  (ctx, { channel_id, is_typing }) => {
+    const now = BigInt(Date.now());
+    const user = getUserFromSender(ctx);
+
+    if (!isChannelMember(ctx, channel_id, user.id)) {
+      throw new Error('You are not a member of this channel');
+    }
+
+    let existing = null;
+    for (const row of ctx.db.chat_typing.iter()) {
+      if (row.channel_id === channel_id && row.user_id === user.id) {
+        existing = row;
+        break;
+      }
+    }
+
+    if (existing) {
+      ctx.db.chat_typing.id.update({
+        ...existing,
+        is_typing,
+        updated_at: now,
+      });
+      return;
+    }
+
+    ctx.db.chat_typing.insert({
+      id: 0n,
+      channel_id,
+      user_id: user.id,
+      is_typing,
+      updated_at: now,
+    });
+  }
+);
+
+/**
+ * Track channel read state per user to power unread counts.
+ */
+export const markChannelRead = spacetimedb.reducer(
+  { channel_id: t.u64() },
+  (ctx, { channel_id }) => {
+    const now = BigInt(Date.now());
+    const user = getUserFromSender(ctx);
+
+    if (!isChannelMember(ctx, channel_id, user.id)) {
+      throw new Error('You are not a member of this channel');
+    }
+
+    let existing = null;
+    for (const row of ctx.db.chat_read_state.iter()) {
+      if (row.channel_id === channel_id && row.user_id === user.id) {
+        existing = row;
+        break;
+      }
+    }
+
+    if (existing) {
+      ctx.db.chat_read_state.id.update({
+        ...existing,
+        last_read_at: now,
+        updated_at: now,
+      });
+      return;
+    }
+
+    ctx.db.chat_read_state.insert({
+      id: 0n,
+      channel_id,
+      user_id: user.id,
+      last_read_at: now,
+      updated_at: now,
+    });
+  }
+);
+
+/**
+ * Toggle emoji reactions on a message.
+ */
+export const toggleReaction = spacetimedb.reducer(
+  { message_id: t.u64(), emoji: t.string() },
+  (ctx, { message_id, emoji }) => {
+    const now = BigInt(Date.now());
+    const user = getUserFromSender(ctx);
+    const trimmed = emoji.trim();
+
+    if (trimmed.length === 0 || trimmed.length > 12) {
+      throw new Error('Reaction emoji must be 1-12 characters');
+    }
+
+    const message = ctx.db.chat_message.id.find(message_id);
+    if (!message) throw new Error('Message not found');
+
+    if (!isChannelMember(ctx, message.channel_id, user.id)) {
+      throw new Error('You are not a member of this channel');
+    }
+
+    let existing = null;
+    for (const row of ctx.db.chat_reaction.iter()) {
+      if (row.message_id === message_id && row.user_id === user.id && row.emoji === trimmed) {
+        existing = row;
+        break;
+      }
+    }
+
+    if (existing) {
+      ctx.db.chat_reaction.id.update({
+        ...existing,
+        is_active: !existing.is_active,
+        updated_at: now,
+      });
+      return;
+    }
+
+    ctx.db.chat_reaction.insert({
+      id: 0n,
+      message_id,
+      user_id: user.id,
+      emoji: trimmed,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+);
+
+/**
+ * Edit an existing message sent by the current user.
+ */
+export const editMessage = spacetimedb.reducer(
+  { message_id: t.u64(), content: t.string() },
+  (ctx, { message_id, content }) => {
+    const now = BigInt(Date.now());
+    const user = getUserFromSender(ctx);
+    const message = ctx.db.chat_message.id.find(message_id);
+    if (!message) throw new Error('Message not found');
+    if (message.sender_id !== user.id) throw new Error('You can only edit your own messages');
+    if (content.trim().length === 0) throw new Error('Message cannot be empty');
+
+    ctx.db.chat_message.id.update({
+      ...message,
+      content,
+      edited_at: now,
+    });
   }
 );

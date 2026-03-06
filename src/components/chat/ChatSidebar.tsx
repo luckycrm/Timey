@@ -11,7 +11,6 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import GroupAddRoundedIcon from '@mui/icons-material/GroupAddRounded';
 import SearchIcon from '@mui/icons-material/Search';
 import TagRoundedIcon from '@mui/icons-material/TagRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded';
 
 interface ChatChannel {
@@ -24,6 +23,8 @@ interface ChatChannel {
 interface ChatUser {
     id: bigint;
     name: string;
+    status?: string;
+    lastSeenAt?: bigint;
     lastLoginAt?: bigint;
 }
 
@@ -58,9 +59,12 @@ function formatRelativeTime(timestamp: bigint): string {
     return `${Math.floor(deltaMs / oneDay)}d`;
 }
 
-function isLikelyOnline(lastLoginAt?: bigint): boolean {
-    if (lastLoginAt === undefined) return false;
-    return Date.now() - Number(lastLoginAt) < 5 * 60_000;
+function isLikelyOnline(user?: ChatUser | null): boolean {
+    if (!user) return false;
+    if (user.status === 'offline') return false;
+    const lastSeen = user.lastSeenAt ?? user.lastLoginAt;
+    if (lastSeen === undefined) return false;
+    return Date.now() - Number(lastSeen) < 60_000;
 }
 
 export function ChatSidebar({
@@ -210,7 +214,7 @@ export function ChatSidebar({
                                     const lastMsg = getLastMessage.get(String(channel.id));
                                     const unreadCount = unreadCountsByChannel[String(channel.id)] || 0;
                                     const peer = getUserById(peerByChannel[String(channel.id)]);
-                                    const peerOnline = isLikelyOnline(peer?.lastLoginAt);
+                                    const peerOnline = isLikelyOnline(peer);
 
                                     return (
                                         <Box

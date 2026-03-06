@@ -38,10 +38,15 @@ import AddChannelMemberReducer from "./add_channel_member_reducer";
 import CreateChannelReducer from "./create_channel_reducer";
 import CreateInviteReducer from "./create_invite_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
+import EditMessageReducer from "./edit_message_reducer";
 import GenerateJoinIdReducer from "./generate_join_id_reducer";
+import HeartbeatReducer from "./heartbeat_reducer";
 import JoinOrganizationReducer from "./join_organization_reducer";
+import MarkChannelReadReducer from "./mark_channel_read_reducer";
 import RegisterUserReducer from "./register_user_reducer";
 import SendMessageReducer from "./send_message_reducer";
+import SetTypingReducer from "./set_typing_reducer";
+import ToggleReactionReducer from "./toggle_reaction_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
 
 // Import all procedure arg schemas
@@ -50,11 +55,15 @@ import UpdateProfileReducer from "./update_profile_reducer";
 import ChatChannelRow from "./chat_channel_table";
 import ChatChannelMemberRow from "./chat_channel_member_table";
 import ChatMessageRow from "./chat_message_table";
+import ChatReactionRow from "./chat_reaction_table";
+import ChatReadStateRow from "./chat_read_state_table";
+import ChatTypingRow from "./chat_typing_table";
 import InviteRow from "./invite_table";
 import JoinIdRow from "./join_id_table";
 import OrganizationRow from "./organization_table";
 import OrganizationMemberRow from "./organization_member_table";
 import UserRow from "./user_table";
+import UserPresenceRow from "./user_presence_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -100,6 +109,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'parent_message_id', algorithm: 'btree', columns: [
+        'parentMessageId',
+      ] },
       { name: 'sender_id', algorithm: 'btree', columns: [
         'senderId',
       ] },
@@ -108,6 +120,57 @@ const tablesSchema = __schema({
       { name: 'chat_message_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ChatMessageRow),
+  chat_reaction: __table({
+    name: 'chat_reaction',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'message_id', algorithm: 'btree', columns: [
+        'messageId',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_reaction_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatReactionRow),
+  chat_read_state: __table({
+    name: 'chat_read_state',
+    indexes: [
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_read_state_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatReadStateRow),
+  chat_typing: __table({
+    name: 'chat_typing',
+    indexes: [
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_typing_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatTypingRow),
   invite: __table({
     name: 'invite',
     indexes: [
@@ -190,6 +253,23 @@ const tablesSchema = __schema({
       { name: 'user_identity_key', constraint: 'unique', columns: ['identity'] },
     ],
   }, UserRow),
+  user_presence: __table({
+    name: 'user_presence',
+    indexes: [
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'user_presence_user_id_key', constraint: 'unique', columns: ['userId'] },
+    ],
+  }, UserPresenceRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
@@ -198,10 +278,15 @@ const reducersSchema = __reducers(
   __reducerSchema("create_channel", CreateChannelReducer),
   __reducerSchema("create_invite", CreateInviteReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
+  __reducerSchema("edit_message", EditMessageReducer),
   __reducerSchema("generate_join_id", GenerateJoinIdReducer),
+  __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("join_organization", JoinOrganizationReducer),
+  __reducerSchema("mark_channel_read", MarkChannelReadReducer),
   __reducerSchema("register_user", RegisterUserReducer),
   __reducerSchema("send_message", SendMessageReducer),
+  __reducerSchema("set_typing", SetTypingReducer),
+  __reducerSchema("toggle_reaction", ToggleReactionReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
 );
 
