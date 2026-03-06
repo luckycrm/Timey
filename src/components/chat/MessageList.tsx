@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { MouseEvent, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -7,11 +7,16 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import AddReactionRoundedIcon from '@mui/icons-material/AddReactionRounded';
 import SubdirectoryArrowRightRoundedIcon from '@mui/icons-material/SubdirectoryArrowRightRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import { chatColors } from '../../theme/chatColors';
 
 interface Message {
     id: bigint;
@@ -35,14 +40,16 @@ interface MessageListProps {
     currentUserId: bigint | null;
     currentUserName?: string;
     searchTerm?: string;
+    threadMode?: boolean;
     reactionsByMessage?: Record<string, ReactionSummary[]>;
     replyCountByMessage?: Record<string, number>;
     onToggleReaction?: (messageId: bigint, emoji: string) => void;
     onOpenThread?: (messageId: bigint) => void;
+    onReply?: (message: Message) => void;
     onEditMessage?: (messageId: bigint, content: string) => Promise<void> | void;
 }
 
-const QUICK_REACTIONS = ['👍', '🔥', '😂'];
+const QUICK_REACTIONS = ['👍', '🔥', '😂', '🎉', '✅', '👀'];
 
 function formatTime(timestamp: bigint): string {
     const date = new Date(Number(timestamp));
@@ -66,10 +73,12 @@ export function MessageList({
     currentUserId,
     currentUserName = '',
     searchTerm = '',
+    threadMode = false,
     reactionsByMessage = {},
     replyCountByMessage = {},
     onToggleReaction,
     onOpenThread,
+    onReply,
     onEditMessage,
 }: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -78,12 +87,16 @@ export function MessageList({
     const [editingMessageId, setEditingMessageId] = useState<bigint | null>(null);
     const [editingValue, setEditingValue] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [reactionAnchorEl, setReactionAnchorEl] = useState<HTMLElement | null>(null);
+    const [reactionTargetMessageId, setReactionTargetMessageId] = useState<bigint | null>(null);
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
         if (isNearBottom) {
-            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+            container.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
         }
     }, [isNearBottom, messages.length]);
 
@@ -116,7 +129,7 @@ export function MessageList({
                         href={piece}
                         target="_blank"
                         rel="noreferrer"
-                        sx={{ color: '#74a7ff', textDecoration: 'underline', wordBreak: 'break-all' }}
+                        sx={{ color: chatColors.textPrimary, textDecoration: 'underline', wordBreak: 'break-all' }}
                     >
                         {piece}
                     </Box>
@@ -137,14 +150,14 @@ export function MessageList({
                         component="span"
                         sx={{
                             ...(isMention && {
-                                color: isOwnMention ? '#ffcf70' : '#9bb8ff',
-                                bgcolor: isOwnMention ? 'rgba(255, 204, 102, 0.15)' : 'rgba(88, 101, 242, 0.16)',
+                                color: chatColors.textPrimary,
+                                bgcolor: isOwnMention ? chatColors.searchHit : chatColors.mention,
                                 borderRadius: 0.8,
                                 px: 0.35,
                                 fontWeight: 600,
                             }),
                             ...(hasSearchHit && {
-                                bgcolor: 'rgba(251, 188, 4, 0.26)',
+                                bgcolor: chatColors.searchHit,
                                 borderRadius: 0.7,
                             }),
                         }}
@@ -181,10 +194,36 @@ export function MessageList({
         }
     };
 
+    const openReactionMenu = (event: MouseEvent<HTMLElement>, messageId: bigint) => {
+        setReactionAnchorEl(event.currentTarget);
+        setReactionTargetMessageId(messageId);
+    };
+
+    const closeReactionMenu = () => {
+        setReactionAnchorEl(null);
+        setReactionTargetMessageId(null);
+    };
+
+    const selectReaction = (emoji: string) => {
+        if (reactionTargetMessageId != null) {
+            onToggleReaction?.(reactionTargetMessageId, emoji);
+        }
+        closeReactionMenu();
+    };
+
     if (sortedMessages.length === 0) {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="body2" sx={{ color: '#555' }}>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: chatColors.textFaint,
+                        maxWidth: '92%',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
                     {normalizedSearch ? 'No messages match your search.' : 'No messages yet. Start the conversation!'}
                 </Typography>
             </Box>
@@ -194,13 +233,16 @@ export function MessageList({
     return (
         <Box
             sx={{
-                flexGrow: 1,
+                flex: '1 1 auto',
+                minHeight: 0,
                 overflowY: 'auto',
-                px: 3,
-                py: 2,
+                overscrollBehavior: 'contain',
+                maxHeight: '100%',
+                px: threadMode ? { xs: 0.9, sm: 1.2 } : { xs: 1.4, sm: 2.2, md: 2.8 },
+                py: threadMode ? 1.25 : 2.2,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 0.5,
+                gap: 0.35,
                 position: 'relative',
             }}
             ref={containerRef}
@@ -208,22 +250,37 @@ export function MessageList({
         >
             {groups.map((group) => (
                 <Box key={group.date}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2 }}>
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#1a1a1a' }} />
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                color: '#555',
-                                fontWeight: 600,
-                                fontSize: '0.7rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                            }}
-                        >
-                            {group.date}
-                        </Typography>
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#1a1a1a' }} />
-                    </Box>
+                    {threadMode ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', my: 1.1 }}>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: chatColors.textFaint,
+                                    fontWeight: 600,
+                                    fontSize: '0.66rem',
+                                }}
+                            >
+                                {group.date}
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 2.2 }}>
+                            <Box sx={{ flex: 1, height: '1px', bgcolor: chatColors.border }} />
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: chatColors.textFaint,
+                                    fontWeight: 600,
+                                    fontSize: '0.7rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                }}
+                            >
+                                {group.date}
+                            </Typography>
+                            <Box sx={{ flex: 1, height: '1px', bgcolor: chatColors.border }} />
+                        </Box>
+                    )}
 
                     {group.messages.map((msg, i) => {
                         const sender = getSender(msg.sender_id);
@@ -235,7 +292,7 @@ export function MessageList({
                         const replyCount = replyCountByMessage[String(msg.id)] || 0;
                         const isEditing = editingMessageId === msg.id;
 
-                        const colors = ['#1565c0', '#00695c', '#ef6c00', '#c62828', '#6a1b9a', '#0277bd'];
+                        const colors = ['#1a1a1a', '#222222', '#2a2a2a', '#333333', '#444444', '#555555'];
                         const colorIndex = sender
                             ? sender.name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) % colors.length
                             : 0;
@@ -245,21 +302,22 @@ export function MessageList({
                                 key={String(msg.id)}
                                 sx={{
                                     display: 'flex',
-                                    gap: 1.5,
-                                    py: showAvatar ? 0.8 : 0.15,
-                                    px: 1,
-                                    borderRadius: 1,
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' },
+                                    alignItems: 'flex-start',
+                                    gap: 1.15,
+                                    py: showAvatar ? 0.68 : 0.28,
+                                    px: threadMode ? 0.7 : 1,
+                                    borderRadius: 1.25,
+                                    '&:hover': { bgcolor: chatColors.hoverSoft },
                                 }}
                             >
-                                <Box sx={{ width: 36, flexShrink: 0 }}>
+                                <Box sx={{ width: 36, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
                                     {showAvatar && sender && (
                                         <Avatar
                                             sx={{
-                                                width: 36,
-                                                height: 36,
+                                                width: 34,
+                                                height: 34,
                                                 bgcolor: colors[colorIndex],
-                                                fontSize: '0.8rem',
+                                                fontSize: '0.78rem',
                                                 fontWeight: 800,
                                             }}
                                         >
@@ -268,24 +326,41 @@ export function MessageList({
                                     )}
                                 </Box>
 
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Box sx={{ flex: 1, minWidth: 0, pr: 0.8 }}>
                                     {showAvatar && (
-                                        <Stack direction="row" spacing={1} alignItems="baseline">
+                                        <Stack
+                                            direction="row"
+                                            spacing={0.75}
+                                            alignItems="baseline"
+                                            sx={{ mb: 0.3 }}
+                                        >
                                             <Typography
                                                 variant="body2"
                                                 sx={{
                                                     fontWeight: 700,
-                                                    color: isOwn ? '#7cb3f5' : '#e0e0e0',
-                                                    fontSize: '0.85rem',
+                                                    color: '#e0e0e0',
+                                                    fontSize: '0.84rem',
                                                 }}
                                             >
-                                                {sender?.name || 'Unknown'}
+                                                {sender?.name || currentUserName || 'Unknown'}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ color: '#555', fontSize: '0.65rem' }}>
+                                            {isOwn && (
+                                                <Typography
+                                                    variant="caption"
+                                                    sx={{
+                                                        color: '#74a7ff',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.67rem',
+                                                    }}
+                                                >
+                                                    You
+                                                </Typography>
+                                            )}
+                                            <Typography variant="caption" sx={{ color: chatColors.textFaint, fontSize: '0.65rem' }}>
                                                 {formatTime(msg.created_at)}
                                             </Typography>
                                             {(msg.edited_at || 0n) > 0n && (
-                                                <Typography variant="caption" sx={{ color: '#647092', fontSize: '0.62rem' }}>
+                                                <Typography variant="caption" sx={{ color: chatColors.textSecondary, fontSize: '0.62rem' }}>
                                                     (edited)
                                                 </Typography>
                                             )}
@@ -293,15 +368,21 @@ export function MessageList({
                                     )}
 
                                     {isEditing ? (
-                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.35 }}>
+                                        <Stack
+                                            direction="row"
+                                            spacing={0.75}
+                                            alignItems="center"
+                                            sx={{ mt: 0.2 }}
+                                        >
                                             <Box
                                                 sx={{
                                                     flexGrow: 1,
-                                                    border: '1px solid #30374f',
-                                                    borderRadius: 1,
+                                                    border: `1px solid ${chatColors.borderStrong}`,
+                                                    borderRadius: 1.5,
                                                     px: 1,
-                                                    py: 0.4,
-                                                    bgcolor: '#10131b',
+                                                    py: 0.5,
+                                                    bgcolor: chatColors.inputBg,
+                                                    minWidth: 180,
                                                 }}
                                             >
                                                 <InputBase
@@ -310,14 +391,14 @@ export function MessageList({
                                                     multiline
                                                     maxRows={4}
                                                     fullWidth
-                                                    sx={{ color: '#fff', fontSize: '0.84rem' }}
+                                                    sx={{ color: chatColors.textPrimary, fontSize: '0.84rem' }}
                                                 />
                                             </Box>
                                             <IconButton
                                                 size="small"
                                                 onClick={() => void saveEdit(msg.id)}
                                                 disabled={isSavingEdit || !editingValue.trim()}
-                                                sx={{ color: '#9fd3a8' }}
+                                                sx={{ color: chatColors.success }}
                                             >
                                                 <CheckRoundedIcon sx={{ fontSize: 17 }} />
                                             </IconButton>
@@ -327,7 +408,7 @@ export function MessageList({
                                                     setEditingMessageId(null);
                                                     setEditingValue('');
                                                 }}
-                                                sx={{ color: '#d8939c' }}
+                                                sx={{ color: chatColors.danger }}
                                             >
                                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                                             </IconButton>
@@ -338,7 +419,7 @@ export function MessageList({
                                             sx={{
                                                 color: '#d0d0d0',
                                                 fontSize: '0.85rem',
-                                                lineHeight: 1.5,
+                                                lineHeight: 1.55,
                                                 wordBreak: 'break-word',
                                                 whiteSpace: 'pre-wrap',
                                             }}
@@ -347,41 +428,68 @@ export function MessageList({
                                         </Typography>
                                     )}
 
-                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5, flexWrap: 'wrap' }}>
-                                        {QUICK_REACTIONS.map((emoji) => (
+                                    <Stack
+                                        className="message-actions"
+                                        direction="row"
+                                        spacing={0.65}
+                                        alignItems="center"
+                                        sx={{
+                                            mt: 0.35,
+                                            flexWrap: 'wrap',
+                                            rowGap: 0.35,
+                                            opacity: 1,
+                                        }}
+                                    >
+                                        {onToggleReaction && (
+                                            <Tooltip title="Add reaction">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(event) => openReactionMenu(event, msg.id)}
+                                                    sx={{
+                                                        width: 22,
+                                                        height: 22,
+                                                        color: chatColors.textSecondary,
+                                                        '&:hover': {
+                                                            color: chatColors.textPrimary,
+                                                            bgcolor: chatColors.hover,
+                                                        },
+                                                    }}
+                                                >
+                                                    <AddReactionRoundedIcon sx={{ fontSize: 14 }} />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {(onReply || onOpenThread) && (
                                             <Button
-                                                key={`${String(msg.id)}-${emoji}`}
                                                 size="small"
-                                                onClick={() => onToggleReaction?.(msg.id, emoji)}
-                                                sx={{
-                                                    minWidth: 28,
-                                                    px: 0.8,
-                                                    py: 0,
-                                                    color: '#8992ac',
-                                                    borderRadius: 1,
-                                                    textTransform: 'none',
-                                                    fontSize: '0.72rem',
-                                                    '&:hover': { bgcolor: 'rgba(88,101,242,0.16)', color: '#fff' },
+                                                onClick={() => {
+                                                    if (onReply) {
+                                                        onReply(msg);
+                                                    } else if (onOpenThread) {
+                                                        onOpenThread(msg.id);
+                                                    }
                                                 }}
-                                            >
-                                                {emoji}
-                                            </Button>
-                                        ))}
-                                        {onOpenThread && (
-                                            <Button
-                                                size="small"
-                                                onClick={() => onOpenThread(msg.id)}
                                                 startIcon={<SubdirectoryArrowRightRoundedIcon sx={{ fontSize: 13 }} />}
                                                 sx={{
                                                     textTransform: 'none',
                                                     minWidth: 0,
-                                                    color: '#7f8db5',
+                                                    color: '#9ec0ff',
                                                     fontSize: '0.71rem',
-                                                    px: 0.8,
-                                                    py: 0,
+                                                    fontWeight: 700,
+                                                    px: 0.95,
+                                                    py: 0.2,
+                                                    borderRadius: 1,
+                                                    bgcolor: 'rgba(116,167,255,0.14)',
+                                                    border: '1px solid rgba(116,167,255,0.35)',
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(116,167,255,0.24)',
+                                                        borderColor: 'rgba(116,167,255,0.5)',
+                                                    },
                                                 }}
                                             >
-                                                Reply
+                                                {replyCount > 0 && onOpenThread
+                                                    ? `View thread (${replyCount})`
+                                                    : 'Reply'}
                                             </Button>
                                         )}
                                         {isOwn && onEditMessage && !isEditing && (
@@ -392,9 +500,9 @@ export function MessageList({
                                                 sx={{
                                                     textTransform: 'none',
                                                     minWidth: 0,
-                                                    color: '#7f8db5',
+                                                    color: chatColors.textSecondary,
                                                     fontSize: '0.71rem',
-                                                    px: 0.8,
+                                                    px: 0.7,
                                                     py: 0,
                                                 }}
                                             >
@@ -403,8 +511,17 @@ export function MessageList({
                                         )}
                                     </Stack>
 
-                                    {(reactions.length > 0 || replyCount > 0) && (
-                                        <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mt: 0.45, flexWrap: 'wrap' }}>
+                                    {reactions.length > 0 && (
+                                        <Stack
+                                            direction="row"
+                                            spacing={0.55}
+                                            alignItems="center"
+                                            sx={{
+                                                mt: 0.4,
+                                                flexWrap: 'wrap',
+                                                rowGap: 0.35,
+                                            }}
+                                        >
                                             {reactions.map((reaction) => (
                                                 <Chip
                                                     key={`${String(msg.id)}-${reaction.emoji}`}
@@ -413,29 +530,13 @@ export function MessageList({
                                                     onClick={() => onToggleReaction?.(msg.id, reaction.emoji)}
                                                     sx={{
                                                         height: 22,
-                                                        bgcolor: reaction.reactedByMe ? 'rgba(88,101,242,0.22)' : 'rgba(255,255,255,0.06)',
-                                                        color: reaction.reactedByMe ? '#d6e0ff' : '#c2c8da',
-                                                        border: reaction.reactedByMe ? '1px solid rgba(88,101,242,0.45)' : '1px solid transparent',
+                                                        bgcolor: reaction.reactedByMe ? chatColors.selectionStrong : chatColors.hover,
+                                                        color: reaction.reactedByMe ? chatColors.textPrimary : '#c2c8da',
+                                                        border: reaction.reactedByMe ? `1px solid ${chatColors.borderHover}` : '1px solid transparent',
                                                         '& .MuiChip-label': { px: 0.8, fontSize: '0.72rem', fontWeight: 600 },
                                                     }}
                                                 />
                                             ))}
-                                            {replyCount > 0 && onOpenThread && (
-                                                <Button
-                                                    size="small"
-                                                    onClick={() => onOpenThread(msg.id)}
-                                                    sx={{
-                                                        textTransform: 'none',
-                                                        color: '#7f8db5',
-                                                        fontSize: '0.71rem',
-                                                        minWidth: 0,
-                                                        px: 0.7,
-                                                        py: 0,
-                                                    }}
-                                                >
-                                                    {replyCount} repl{replyCount === 1 ? 'y' : 'ies'}
-                                                </Button>
-                                            )}
                                         </Stack>
                                     )}
                                 </Box>
@@ -448,24 +549,58 @@ export function MessageList({
             {!isNearBottom && (
                 <Button
                     size="small"
-                    onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    onClick={() => {
+                        const container = containerRef.current;
+                        if (!container) return;
+                        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                    }}
                     startIcon={<KeyboardArrowDownRoundedIcon />}
                     sx={{
                         position: 'sticky',
                         bottom: 10,
                         alignSelf: 'center',
-                        bgcolor: '#5865F2',
-                        color: '#fff',
+                        bgcolor: chatColors.actionBg,
+                        color: chatColors.actionText,
                         textTransform: 'none',
                         borderRadius: 4,
                         px: 1.5,
                         minHeight: 30,
-                        '&:hover': { bgcolor: '#4c59de' },
+                        '&:hover': { bgcolor: chatColors.actionBgHover },
                     }}
                 >
                     Jump to present
                 </Button>
             )}
+            <Menu
+                anchorEl={reactionAnchorEl}
+                open={Boolean(reactionAnchorEl)}
+                onClose={closeReactionMenu}
+                anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            bgcolor: chatColors.panelBg,
+                            border: `1px solid ${chatColors.borderStrong}`,
+                        },
+                    },
+                }}
+            >
+                {QUICK_REACTIONS.map((emoji) => (
+                    <MenuItem
+                        key={emoji}
+                        onClick={() => selectReaction(emoji)}
+                        sx={{
+                            minHeight: 28,
+                            justifyContent: 'center',
+                            color: chatColors.textPrimary,
+                            fontSize: '1rem',
+                        }}
+                    >
+                        {emoji}
+                    </MenuItem>
+                ))}
+            </Menu>
         </Box>
     );
 }

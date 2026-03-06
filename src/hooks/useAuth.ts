@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSession, logout as logoutFn } from '../server/otp';
-import { useNavigate } from '@tanstack/react-router';
-import { clearStoredToken } from '../router';
+import { resetClientState } from '../router';
 
 interface AuthState {
     email: string | null;
@@ -15,8 +14,6 @@ export function useAuth() {
         isAuthenticated: false,
         isLoading: true,
     });
-    const navigate = useNavigate();
-
     const checkSession = useCallback(async () => {
         try {
             const result = await getSession();
@@ -41,17 +38,20 @@ export function useAuth() {
     const logout = useCallback(async () => {
         try {
             await logoutFn();
-            clearStoredToken();
+        } catch (error) {
+            console.error('Logout failed:', error);
+        } finally {
+            resetClientState({ clearSpacetimeToken: true });
             setState({
                 email: null,
                 isAuthenticated: false,
                 isLoading: false,
             });
-            navigate({ to: '/login' });
-        } catch (error) {
-            console.error('Logout failed:', error);
+            if (typeof window !== 'undefined') {
+                window.location.replace('/login?fresh=1');
+            }
         }
-    }, [navigate]);
+    }, []);
 
     return {
         ...state,

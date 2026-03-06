@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -26,6 +27,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 import { toast } from 'sonner';
+import { useNavigate } from '@tanstack/react-router';
 import { useSpacetimeDBQuery, useReducer } from 'spacetimedb/tanstack';
 import { tables, reducers } from '../../module_bindings';
 import type {
@@ -45,6 +47,7 @@ import { DashboardLayout } from '../layout/DashboardLayout';
 import { ChatSidebar } from './ChatSidebar';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { chatColors } from '../../theme/chatColors';
 
 const NONE_U64 = 18446744073709551615n;
 
@@ -88,15 +91,23 @@ function isOnline(presence: DbUserPresence | null, fallbackLastSeen: bigint): bo
     return Date.now() - lastSeen < 90_000;
 }
 
+function formatMessageTime(timestamp: bigint): string {
+    return new Date(Number(timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export function ChatPage() {
-    const { isAuthenticated } = useAuth();
-    const { memberships } = useOrganizationMembership({ enabled: isAuthenticated });
+    const { isAuthenticated, isLoading, logout } = useAuth();
+    const { memberships, hasOrganization, isCheckingMembership } = useOrganizationMembership({
+        enabled: isAuthenticated,
+    });
+    const navigate = useNavigate();
 
     const [allChannels] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_channel : 'skip');
     const [allChannelMembers] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_channel_member : 'skip');
     const [allMessages] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_message : 'skip');
     const [allUsers] = useSpacetimeDBQuery(isAuthenticated ? tables.user : 'skip');
     const [allMemberships] = useSpacetimeDBQuery(isAuthenticated ? tables.organization_member : 'skip');
+    const [allOrganizations] = useSpacetimeDBQuery(isAuthenticated ? tables.organization : 'skip');
     const [allReactions] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_reaction : 'skip');
     const [allReadStates] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_read_state : 'skip');
     const [allTypingRows] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_typing : 'skip');
@@ -123,27 +134,35 @@ export function ChatPage() {
     const [selectedInviteMemberIds, setSelectedInviteMemberIds] = useState<bigint[]>([]);
     const [activeThreadParentId, setActiveThreadParentId] = useState<bigint | null>(null);
     const [composerTyping, setComposerTyping] = useState(false);
+    const [threadComposerFocusSignal, setThreadComposerFocusSignal] = useState(0);
 
     const lastMarkedReadRef = useRef<string>('');
     const typingSyncRef = useRef<string>('');
 
-    const orgId = memberships?.[0]?.orgId ?? null;
+    const currentMembership = memberships[0];
+    const orgId = currentMembership?.orgId ?? null;
 
     const channels = (allChannels || []) as DbChatChannel[];
     const channelMembers = (allChannelMembers || []) as DbChatChannelMember[];
     const messages = (allMessages || []) as DbChatMessage[];
     const users = (allUsers || []) as DbUser[];
     const membershipsForAllUsers = (allMemberships || []) as DbOrganizationMember[];
+    const organizations = allOrganizations || [];
     const reactions = (allReactions || []) as DbChatReaction[];
     const readStates = (allReadStates || []) as DbChatReadState[];
     const typingRows = (allTypingRows || []) as DbChatTyping[];
     const presenceRows = (allPresenceRows || []) as DbUserPresence[];
 
     const currentUser = useMemo(() => {
-        const member = memberships[0];
-        if (!member) return null;
-        return users.find((u) => u.id === member.userId) || null;
-    }, [memberships, users]);
+        if (!currentMembership) return null;
+        return users.find((u) => u.id === currentMembership.userId) || null;
+    }, [currentMembership, users]);
+
+    const orgName = useMemo(() => {
+        if (orgId == null) return 'Workspace';
+        const org = organizations.find((candidate) => candidate.id === orgId);
+        return org?.name || 'Workspace';
+    }, [orgId, organizations]);
 
     const userById = useMemo(() => {
         const map = new Map<string, DbUser>();
@@ -241,6 +260,11 @@ export function ChatPage() {
             .filter((row): row is DbUser => row != null)
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [channelMembersByChannel, selectedChannelId, userById]);
+
+    const mentionableUsers = useMemo(
+        () => selectedChannelMembers.map((member) => ({ id: member.id, name: member.name })),
+        [selectedChannelMembers]
+    );
 
     const orgMembers = useMemo(() => {
         if (orgId == null || currentUser == null) return [];
@@ -379,6 +403,17 @@ export function ChatPage() {
         if (activeThreadParentId == null) return [];
         return repliesByParent.get(String(activeThreadParentId)) || [];
     }, [activeThreadParentId, repliesByParent]);
+
+    const activeThreadRootSender = useMemo(() => {
+        if (!activeThreadRootMessage) return null;
+        return userById.get(String(activeThreadRootMessage.senderId)) || null;
+    }, [activeThreadRootMessage, userById]);
+
+    const activeThreadRootIsOwn = !!(
+        activeThreadRootMessage &&
+        currentUser &&
+        activeThreadRootMessage.senderId === currentUser.id
+    );
 
     const othersTyping = useMemo(() => {
         if (selectedChannelId == null || currentUser == null) return [];
@@ -609,6 +644,15 @@ export function ChatPage() {
         }
     };
 
+    const openThreadFromMessage = (messageId: bigint) => {
+        setActiveThreadParentId(messageId);
+        setThreadComposerFocusSignal((current) => current + 1);
+    };
+
+    const focusThreadComposer = () => {
+        setThreadComposerFocusSignal((current) => current + 1);
+    };
+
     const sidebarChannels: SidebarChannel[] = myChannels.map((channel) => ({
         id: channel.id,
         name: channel.name,
@@ -664,8 +708,32 @@ export function ChatPage() {
         })
         .reduce((acc, [, count]) => acc + count, 0);
 
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            navigate({ to: '/login' });
+        }
+    }, [isAuthenticated, isLoading, navigate]);
+
+    useEffect(() => {
+        if (!isLoading && isAuthenticated && !isCheckingMembership && !hasOrganization) {
+            navigate({ to: '/onboarding' });
+        }
+    }, [hasOrganization, isAuthenticated, isCheckingMembership, isLoading, navigate]);
+
+    if (isLoading || (isAuthenticated && isCheckingMembership)) {
+        return (
+            <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: '#000000' }}>
+                <CircularProgress size={24} sx={{ color: '#ffffff' }} />
+            </Box>
+        );
+    }
+
+    if (!isAuthenticated || !hasOrganization) return null;
+
     return (
         <DashboardLayout
+            onLogout={logout}
+            orgName={orgName}
             chatSidebar={
                 <ChatSidebar
                     channels={sidebarChannels}
@@ -703,9 +771,9 @@ export function ChatPage() {
                             >
                                 <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
                                     {selectedChannel.type === 'group' ? (
-                                        <TagRoundedIcon sx={{ fontSize: 18, color: '#7f8db5' }} />
+                                        <TagRoundedIcon sx={{ fontSize: 18, color: '#858585' }} />
                                     ) : (
-                                        <ChatOutlinedIcon sx={{ fontSize: 18, color: '#7f8db5' }} />
+                                        <ChatOutlinedIcon sx={{ fontSize: 18, color: '#858585' }} />
                                     )}
                                     <Box sx={{ minWidth: 0 }}>
                                         <Typography
@@ -721,7 +789,7 @@ export function ChatPage() {
                                         >
                                             {selectedChannel.name}
                                         </Typography>
-                                        <Typography variant="caption" sx={{ color: '#677087', fontSize: '0.68rem' }}>
+                                        <Typography variant="caption" sx={{ color: '#858585', fontSize: '0.68rem' }}>
                                             {channelHeaderSubtitle}
                                         </Typography>
                                     </Box>
@@ -732,18 +800,18 @@ export function ChatPage() {
                                         sx={{
                                             width: 220,
                                             maxWidth: '40vw',
-                                            bgcolor: '#0f1219',
-                                            border: '1px solid #222937',
+                                            bgcolor: '#111111',
+                                            border: '1px solid #333333',
                                             borderRadius: 1.5,
                                             px: 1.1,
                                             py: 0.55,
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: 0.8,
-                                            '&:focus-within': { borderColor: '#5865F2' },
+                                            '&:focus-within': { borderColor: '#ffffff' },
                                         }}
                                     >
-                                        <SearchRoundedIcon sx={{ color: '#68708b', fontSize: 16 }} />
+                                        <SearchRoundedIcon sx={{ color: '#666666', fontSize: 16 }} />
                                         <InputBase
                                             placeholder="Search messages"
                                             value={messageSearch}
@@ -759,14 +827,14 @@ export function ChatPage() {
                                                     setActiveThreadParentId(null);
                                                 } else {
                                                     const firstRoot = mainChannelMessages[0];
-                                                    if (firstRoot) setActiveThreadParentId(firstRoot.id);
+                                                    if (firstRoot) openThreadFromMessage(firstRoot.id);
                                                 }
                                             }}
                                             sx={{
-                                                color: activeThreadParentId ? '#dbe5ff' : '#7d869f',
-                                                bgcolor: activeThreadParentId ? 'rgba(88,101,242,0.16)' : 'transparent',
+                                                color: activeThreadParentId ? '#ffffff' : '#858585',
+                                                bgcolor: activeThreadParentId ? 'rgba(255,255,255,0.08)' : 'transparent',
                                                 borderRadius: 1.5,
-                                                '&:hover': { bgcolor: 'rgba(88,101,242,0.25)', color: '#fff' },
+                                                '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#ffffff' },
                                             }}
                                         >
                                             <ForumRoundedIcon sx={{ fontSize: 20 }} />
@@ -779,12 +847,12 @@ export function ChatPage() {
                                             onClick={() => setAddMembersOpen(true)}
                                             startIcon={<PersonAddAlt1RoundedIcon />}
                                             sx={{
-                                                borderColor: '#2a3142',
-                                                color: '#b9c2d8',
+                                                borderColor: '#333333',
+                                                color: '#858585',
                                                 textTransform: 'none',
                                                 fontWeight: 600,
                                                 borderRadius: 1.5,
-                                                '&:hover': { borderColor: '#4c5a84', color: '#fff' },
+                                                '&:hover': { borderColor: '#555555', color: '#ffffff' },
                                             }}
                                         >
                                             Add People
@@ -795,10 +863,10 @@ export function ChatPage() {
                                         <IconButton
                                             onClick={() => setShowMembersPanel((current) => !current)}
                                             sx={{
-                                                color: showMembersPanel ? '#dbe5ff' : '#7d869f',
-                                                bgcolor: showMembersPanel ? 'rgba(88,101,242,0.16)' : 'transparent',
+                                                color: showMembersPanel ? '#ffffff' : '#858585',
+                                                bgcolor: showMembersPanel ? 'rgba(255,255,255,0.08)' : 'transparent',
                                                 borderRadius: 1.5,
-                                                '&:hover': { bgcolor: 'rgba(88,101,242,0.25)', color: '#fff' },
+                                                '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#ffffff' },
                                             }}
                                         >
                                             <PeopleAltOutlinedIcon sx={{ fontSize: 20 }} />
@@ -812,42 +880,45 @@ export function ChatPage() {
                                     sx={{
                                         px: 3,
                                         py: 0.6,
-                                        borderBottom: '1px solid #151823',
+                                        borderBottom: '1px solid #1a1a1a',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
                                     }}
                                 >
-                                    <Typography variant="caption" sx={{ color: '#90a0c4', fontSize: '0.72rem' }}>
+                                    <Typography variant="caption" sx={{ color: '#858585', fontSize: '0.72rem' }}>
                                         {filteredChannelMessages.length} result{filteredChannelMessages.length === 1 ? '' : 's'}
                                         {' '}for "{messageSearch.trim()}"
                                     </Typography>
                                     <Button
                                         size="small"
                                         onClick={() => setMessageSearch('')}
-                                        sx={{ color: '#7f8db5', textTransform: 'none', minWidth: 0 }}
+                                        sx={{ color: '#858585', textTransform: 'none', minWidth: 0 }}
                                     >
                                         Clear
                                     </Button>
                                 </Box>
                             )}
 
-                            <MessageList
-                                messages={messageListMessages}
-                                users={users}
-                                currentUserId={currentUser?.id || null}
-                                currentUserName={currentUser?.name || ''}
-                                searchTerm={messageSearch}
-                                reactionsByMessage={reactionsByMessage}
-                                replyCountByMessage={replyCountByMessage}
-                                onToggleReaction={handleToggleReaction}
-                                onOpenThread={(messageId) => setActiveThreadParentId(messageId)}
-                                onEditMessage={handleEditMessage}
-                            />
+                            <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex' }}>
+                                <MessageList
+                                    messages={messageListMessages}
+                                    users={users}
+                                    currentUserId={currentUser?.id || null}
+                                    currentUserName={currentUser?.name || ''}
+                                    searchTerm={messageSearch}
+                                    reactionsByMessage={reactionsByMessage}
+                                    replyCountByMessage={replyCountByMessage}
+                                    onToggleReaction={handleToggleReaction}
+                                    onOpenThread={openThreadFromMessage}
+                                    onReply={(message) => openThreadFromMessage(message.id)}
+                                    onEditMessage={handleEditMessage}
+                                />
+                            </Box>
 
                             <Typography
                                 variant="caption"
-                                sx={{ px: 3, py: 0.4, color: '#7f8db5', fontSize: '0.72rem', minHeight: 18 }}
+                                sx={{ px: 3, py: 0.4, color: '#858585', fontSize: '0.72rem', minHeight: 18 }}
                             >
                                 {othersTyping.length > 0
                                     ? `${othersTyping.slice(0, 3).join(', ')} ${othersTyping.length > 1 ? 'are' : 'is'} typing...`
@@ -860,6 +931,7 @@ export function ChatPage() {
                                 onSend={(content) => handleSendMessage(content, 0n)}
                                 channelId={selectedChannel.id}
                                 channelName={selectedChannel.name}
+                                mentionUsers={mentionableUsers}
                                 onTypingChange={setComposerTyping}
                                 draftScope="main"
                             />
@@ -868,9 +940,9 @@ export function ChatPage() {
                         {activeThreadRootMessage ? (
                             <Box
                                 sx={{
-                                    width: { xs: '100%', xl: 340 },
+                                    width: { xs: '100%', lg: 380, xl: 460 },
                                     borderLeft: '1px solid #1a1a1a',
-                                    bgcolor: '#090b10',
+                                    bgcolor: '#050505',
                                     display: 'flex',
                                     flexDirection: 'column',
                                 }}
@@ -879,46 +951,93 @@ export function ChatPage() {
                                     sx={{
                                         px: 2,
                                         py: 1.2,
-                                        borderBottom: '1px solid #181c25',
+                                        borderBottom: '1px solid #1a1a1a',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
                                     }}
                                 >
                                     <Box>
-                                        <Typography sx={{ color: '#e0e6f7', fontSize: '0.86rem', fontWeight: 700 }}>
+                                        <Typography sx={{ color: '#ffffff', fontSize: '0.86rem', fontWeight: 700 }}>
                                             Thread
                                         </Typography>
-                                        <Typography sx={{ color: '#74809e', fontSize: '0.67rem' }}>
-                                            #{selectedChannel.name}
-                                        </Typography>
+                                        <Stack direction="row" spacing={0.7} alignItems="center">
+                                            <Typography sx={{ color: '#858585', fontSize: '0.67rem' }}>
+                                                #{selectedChannel.name}
+                                            </Typography>
+                                            <Typography sx={{ color: '#555', fontSize: '0.67rem' }}>•</Typography>
+                                            <Typography sx={{ color: '#858585', fontSize: '0.67rem' }}>
+                                                {threadReplies.length} repl{threadReplies.length === 1 ? 'y' : 'ies'}
+                                            </Typography>
+                                        </Stack>
                                     </Box>
                                     <IconButton
                                         onClick={() => setActiveThreadParentId(null)}
                                         size="small"
-                                        sx={{ color: '#7582a2' }}
+                                        sx={{ color: '#858585' }}
                                     >
                                         <CloseRoundedIcon sx={{ fontSize: 18 }} />
                                     </IconButton>
                                 </Box>
 
-                                <Box sx={{ px: 2, py: 1.2, borderBottom: '1px solid #181c25' }}>
-                                    <Typography sx={{ color: '#aeb8d3', fontSize: '0.72rem', mb: 0.45 }}>
-                                        Original message
-                                    </Typography>
-                                    <Typography sx={{ color: '#d6dcef', fontSize: '0.8rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                                <Box sx={{ px: 2, py: 1.2, borderBottom: '1px solid #1a1a1a' }}>
+                                    <Stack direction="row" spacing={0.65} alignItems="baseline" sx={{ mb: 0.45 }}>
+                                        <Typography
+                                            sx={{
+                                                color: '#ffffff',
+                                                fontSize: '0.74rem',
+                                                fontWeight: 700,
+                                            }}
+                                        >
+                                            {activeThreadRootSender?.name || 'Unknown'}
+                                        </Typography>
+                                        {activeThreadRootIsOwn && (
+                                            <Typography sx={{ color: '#74a7ff', fontSize: '0.67rem', fontWeight: 700 }}>
+                                                You
+                                            </Typography>
+                                        )}
+                                        <Typography sx={{ color: '#666', fontSize: '0.66rem' }}>
+                                            {formatMessageTime(activeThreadRootMessage.createdAt)}
+                                        </Typography>
+                                    </Stack>
+                                    <Typography sx={{ color: '#ffffff', fontSize: '0.8rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                                         {activeThreadRootMessage.content}
                                     </Typography>
+                                    <Button
+                                        size="small"
+                                        onClick={focusThreadComposer}
+                                        sx={{
+                                            mt: 0.65,
+                                            minWidth: 0,
+                                            textTransform: 'none',
+                                            color: '#9ec0ff',
+                                            fontSize: '0.68rem',
+                                            fontWeight: 700,
+                                            px: 0.9,
+                                            py: 0.15,
+                                            borderRadius: 1,
+                                            bgcolor: 'rgba(116,167,255,0.14)',
+                                            border: '1px solid rgba(116,167,255,0.35)',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(116,167,255,0.24)',
+                                                borderColor: 'rgba(116,167,255,0.5)',
+                                            },
+                                        }}
+                                    >
+                                        Reply in thread
+                                    </Button>
                                 </Box>
 
-                                <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+                                <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex' }}>
                                     <MessageList
                                         messages={threadMessageRows}
                                         users={users}
                                         currentUserId={currentUser?.id || null}
                                         currentUserName={currentUser?.name || ''}
+                                        threadMode
                                         reactionsByMessage={reactionsByMessage}
                                         onToggleReaction={handleToggleReaction}
+                                        onReply={() => focusThreadComposer()}
                                         onEditMessage={handleEditMessage}
                                     />
                                 </Box>
@@ -927,9 +1046,11 @@ export function ChatPage() {
                                     onSend={(content) => handleSendMessage(content, activeThreadRootMessage.id)}
                                     channelId={selectedChannel.id}
                                     channelName={selectedChannel.name}
+                                    mentionUsers={mentionableUsers}
                                     contextHint={`Replying in thread (${threadReplies.length} repl${threadReplies.length === 1 ? 'y' : 'ies'})`}
                                     draftScope={`thread-${String(activeThreadRootMessage.id)}`}
                                     onTypingChange={setComposerTyping}
+                                    focusSignal={threadComposerFocusSignal}
                                 />
                             </Box>
                         ) : showMembersPanel ? (
@@ -937,7 +1058,7 @@ export function ChatPage() {
                                 sx={{
                                     width: 252,
                                     borderLeft: '1px solid #1a1a1a',
-                                    bgcolor: '#090b10',
+                                    bgcolor: '#050505',
                                     display: { xs: 'none', lg: 'flex' },
                                     flexDirection: 'column',
                                 }}
@@ -946,7 +1067,7 @@ export function ChatPage() {
                                     <Typography
                                         variant="caption"
                                         sx={{
-                                            color: '#7f8db5',
+                                            color: '#858585',
                                             fontWeight: 700,
                                             fontSize: '0.68rem',
                                             textTransform: 'uppercase',
@@ -956,7 +1077,7 @@ export function ChatPage() {
                                         Members - {selectedChannelMembers.length}
                                     </Typography>
                                 </Box>
-                                <Divider sx={{ borderColor: '#181c25' }} />
+                                <Divider sx={{ borderColor: '#1a1a1a' }} />
                                 <Stack spacing={0.45} sx={{ p: 1.5, overflowY: 'auto' }}>
                                     {selectedChannelMembers.map((member) => {
                                         const presence = presenceByUser.get(String(member.id)) || null;
@@ -979,8 +1100,8 @@ export function ChatPage() {
                                                         sx={{
                                                             width: 30,
                                                             height: 30,
-                                                            bgcolor: '#1f2a38',
-                                                            color: '#d6e4ff',
+                                                            bgcolor: '#1a1a1a',
+                                                            color: '#ffffff',
                                                             fontSize: '0.76rem',
                                                             fontWeight: 700,
                                                         }}
@@ -997,7 +1118,7 @@ export function ChatPage() {
                                                                 height: 10,
                                                                 borderRadius: '50%',
                                                                 bgcolor: '#38c872',
-                                                                border: '2px solid #090b10',
+                                                                border: '2px solid #050505',
                                                             }}
                                                         />
                                                     )}
@@ -1006,7 +1127,7 @@ export function ChatPage() {
                                                     <Typography
                                                         variant="body2"
                                                         sx={{
-                                                            color: '#d5d9e7',
+                                                            color: '#ffffff',
                                                             fontSize: '0.78rem',
                                                             fontWeight: 600,
                                                             overflow: 'hidden',
@@ -1018,7 +1139,7 @@ export function ChatPage() {
                                                     </Typography>
                                                     <Typography
                                                         variant="caption"
-                                                        sx={{ color: '#7b849e', fontSize: '0.66rem' }}
+                                                        sx={{ color: '#666666', fontSize: '0.66rem' }}
                                                     >
                                                         {formatPresenceLabel(presence, member.lastLoginAt)}
                                                     </Typography>
@@ -1040,7 +1161,7 @@ export function ChatPage() {
                             justifyContent: 'center',
                             gap: 3,
                             px: 3,
-                            background: 'radial-gradient(circle at 40% 0%, rgba(88,101,242,0.16), rgba(0,0,0,0) 45%)',
+                            backgroundColor: chatColors.pageBg,
                         }}
                     >
                         <Box
@@ -1048,18 +1169,18 @@ export function ChatPage() {
                                 width: 84,
                                 height: 84,
                                 borderRadius: 4,
-                                bgcolor: 'rgba(88,101,242,0.13)',
-                                border: '1px solid rgba(88,101,242,0.35)',
+                                bgcolor: 'rgba(255,255,255,0.06)',
+                                border: '1px solid rgba(255,255,255,0.16)',
                                 display: 'grid',
                                 placeItems: 'center',
                             }}
                         >
-                            <ChatOutlinedIcon sx={{ fontSize: 38, color: '#9cb0ff' }} />
+                            <ChatOutlinedIcon sx={{ fontSize: 38, color: '#ffffff' }} />
                         </Box>
                         <Stack spacing={1} alignItems="center">
                             <Typography
                                 variant="h5"
-                                sx={{ fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', textAlign: 'center' }}
+                                sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', textAlign: 'center' }}
                             >
                                 Organization Chat
                             </Typography>
@@ -1067,25 +1188,24 @@ export function ChatPage() {
                                 <Chip
                                     size="small"
                                     label={`${myChannels.length} channels`}
-                                    sx={{ bgcolor: '#111827', color: '#9fb2dd', fontWeight: 600 }}
+                                    sx={{ bgcolor: '#111111', color: '#858585', fontWeight: 600 }}
                                 />
                                 <Chip
                                     size="small"
                                     label={`${dmUnreadTotal} DM unread`}
-                                    sx={{ bgcolor: '#111827', color: '#9fb2dd', fontWeight: 600 }}
+                                    sx={{ bgcolor: '#111111', color: '#858585', fontWeight: 600 }}
                                 />
                                 <Chip
                                     size="small"
                                     label={`${groupUnreadTotal} group unread`}
-                                    sx={{ bgcolor: '#111827', color: '#9fb2dd', fontWeight: 600 }}
+                                    sx={{ bgcolor: '#111111', color: '#858585', fontWeight: 600 }}
                                 />
                             </Stack>
                             <Typography
-                                variant="body2"
-                                sx={{ color: '#73809e', textAlign: 'center', maxWidth: 360, mt: 0.5 }}
+                                variant="caption"
+                                sx={{ color: '#858585', textAlign: 'center', maxWidth: 360, mt: 0.5, fontSize: '0.75rem' }}
                             >
-                                Start direct messages, spin up group channels, keep teams online with live presence,
-                                and use threaded replies plus reactions for cleaner context.
+                                Start a DM or group channel. Presence, threads, and reactions keep chats organized.
                             </Typography>
                         </Stack>
                         <Stack direction="row" spacing={1.5}>
@@ -1094,13 +1214,13 @@ export function ChatPage() {
                                 startIcon={<AddRoundedIcon />}
                                 onClick={() => setNewChatOpen(true)}
                                 sx={{
-                                    bgcolor: '#5865F2',
-                                    color: '#fff',
+                                    bgcolor: '#ffffff',
+                                    color: '#000000',
                                     textTransform: 'none',
                                     fontWeight: 600,
                                     borderRadius: 2,
                                     px: 3,
-                                    '&:hover': { bgcolor: '#4c59de' },
+                                    '&:hover': { bgcolor: '#e0e0e0' },
                                 }}
                             >
                                 New DM
@@ -1110,13 +1230,13 @@ export function ChatPage() {
                                 startIcon={<GroupAddRoundedIcon />}
                                 onClick={() => setNewGroupOpen(true)}
                                 sx={{
-                                    borderColor: '#2d3551',
-                                    color: '#b6c2e6',
+                                    borderColor: '#333333',
+                                    color: '#858585',
                                     textTransform: 'none',
                                     fontWeight: 600,
                                     borderRadius: 2,
                                     px: 3,
-                                    '&:hover': { borderColor: '#4e5a7e', color: '#fff' },
+                                    '&:hover': { borderColor: '#555555', color: '#ffffff' },
                                 }}
                             >
                                 New Group
@@ -1134,20 +1254,20 @@ export function ChatPage() {
                 }}
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0b0d13',
-                        border: '1px solid #252b3c',
+                        bgcolor: '#050505',
+                        border: '1px solid #333333',
                         borderRadius: 2,
                         minWidth: 360,
                     },
                 }}
             >
-                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
+                <DialogTitle sx={{ color: '#ffffff', fontWeight: 700, fontSize: '1rem' }}>
                     Start a direct message
                 </DialogTitle>
                 <DialogContent>
                     <Box
                         sx={{
-                            border: '1px solid #252b3c',
+                            border: '1px solid #333333',
                             borderRadius: 1.5,
                             px: 1.25,
                             py: 0.5,
@@ -1156,16 +1276,16 @@ export function ChatPage() {
                             gap: 1,
                             mb: 1.5,
                             mt: 0.5,
-                            '&:focus-within': { borderColor: '#5865F2' },
+                            '&:focus-within': { borderColor: '#ffffff' },
                         }}
                     >
-                        <SearchRoundedIcon sx={{ color: '#6f7893', fontSize: 17 }} />
+                        <SearchRoundedIcon sx={{ color: '#666666', fontSize: 17 }} />
                         <InputBase
                             placeholder="Search members"
                             value={newDmSearch}
                             onChange={(event) => setNewDmSearch(event.target.value)}
                             fullWidth
-                            sx={{ color: '#fff', fontSize: '0.85rem' }}
+                            sx={{ color: '#ffffff', fontSize: '0.85rem' }}
                         />
                     </Box>
                     <Stack spacing={0.7} sx={{ maxHeight: 320, overflowY: 'auto' }}>
@@ -1181,15 +1301,15 @@ export function ChatPage() {
                                     py: 1,
                                     borderRadius: 1.5,
                                     cursor: 'pointer',
-                                    '&:hover': { bgcolor: 'rgba(88,101,242,0.16)' },
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
                                 }}
                             >
                                 <Avatar
                                     sx={{
                                         width: 33,
                                         height: 33,
-                                        bgcolor: '#1f2a38',
-                                        color: '#d6e4ff',
+                                        bgcolor: '#1a1a1a',
+                                        color: '#ffffff',
                                         fontSize: '0.8rem',
                                         fontWeight: 700,
                                     }}
@@ -1197,17 +1317,17 @@ export function ChatPage() {
                                     {member.name.charAt(0).toUpperCase()}
                                 </Avatar>
                                 <Box>
-                                    <Typography variant="body2" sx={{ color: '#d9deed', fontWeight: 600 }}>
+                                    <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
                                         {member.name}
                                     </Typography>
-                                    <Typography variant="caption" sx={{ color: '#7782a1' }}>
+                                    <Typography variant="caption" sx={{ color: '#858585' }}>
                                         {member.email}
                                     </Typography>
                                 </Box>
                             </Box>
                         ))}
                         {filteredDmCandidates.length === 0 && (
-                            <Typography variant="body2" sx={{ color: '#5f6881', textAlign: 'center', py: 2 }}>
+                            <Typography variant="body2" sx={{ color: '#666666', textAlign: 'center', py: 2 }}>
                                 No matching members found.
                             </Typography>
                         )}
@@ -1219,7 +1339,7 @@ export function ChatPage() {
                             setNewChatOpen(false);
                             setNewDmSearch('');
                         }}
-                        sx={{ color: '#7782a1', textTransform: 'none' }}
+                        sx={{ color: '#858585', textTransform: 'none' }}
                     >
                         Close
                     </Button>
@@ -1231,14 +1351,14 @@ export function ChatPage() {
                 onClose={() => setNewGroupOpen(false)}
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0b0d13',
-                        border: '1px solid #252b3c',
+                        bgcolor: '#050505',
+                        border: '1px solid #333333',
                         borderRadius: 2,
                         minWidth: 380,
                     },
                 }}
             >
-                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
+                <DialogTitle sx={{ color: '#ffffff', fontWeight: 700, fontSize: '1rem' }}>
                     Create a group channel
                 </DialogTitle>
                 <DialogContent>
@@ -1252,12 +1372,12 @@ export function ChatPage() {
                         sx={{
                             mb: 2,
                             mt: 1,
-                            '& .MuiInputBase-root': { color: '#fff', bgcolor: '#0f1219' },
-                            '& .MuiInputLabel-root': { color: '#7782a1' },
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#2d3550' },
+                            '& .MuiInputBase-root': { color: '#ffffff', bgcolor: '#111111' },
+                            '& .MuiInputLabel-root': { color: '#858585' },
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#333333' },
                         }}
                     />
-                    <Typography variant="caption" sx={{ color: '#7b84a0', mb: 1, display: 'block' }}>
+                    <Typography variant="caption" sx={{ color: '#666666', mb: 1, display: 'block' }}>
                         Select members ({selectedMemberIds.length} selected)
                     </Typography>
                     <Stack spacing={0.35} sx={{ maxHeight: 260, overflowY: 'auto' }}>
@@ -1280,13 +1400,13 @@ export function ChatPage() {
                                                 }
                                             }}
                                             sx={{
-                                                color: '#5f6881',
-                                                '&.Mui-checked': { color: '#5865F2' },
+                                                color: '#666666',
+                                                '&.Mui-checked': { color: '#ffffff' },
                                             }}
                                         />
                                     }
                                     label={
-                                        <Typography variant="body2" sx={{ color: '#d8deee' }}>
+                                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
                                             {member.name}
                                         </Typography>
                                     }
@@ -1296,7 +1416,7 @@ export function ChatPage() {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setNewGroupOpen(false)} sx={{ color: '#7782a1', textTransform: 'none' }}>
+                    <Button onClick={() => setNewGroupOpen(false)} sx={{ color: '#858585', textTransform: 'none' }}>
                         Cancel
                     </Button>
                     <Button
@@ -1304,12 +1424,12 @@ export function ChatPage() {
                         disabled={!newChannelName.trim() || selectedMemberIds.length === 0}
                         variant="contained"
                         sx={{
-                            bgcolor: '#5865F2',
-                            color: '#fff',
+                            bgcolor: '#ffffff',
+                            color: '#000000',
                             textTransform: 'none',
                             fontWeight: 600,
-                            '&:hover': { bgcolor: '#4c59de' },
-                            '&.Mui-disabled': { bgcolor: '#2d3550', color: '#647092' },
+                            '&:hover': { bgcolor: '#e0e0e0' },
+                            '&.Mui-disabled': { bgcolor: '#333333', color: '#666666' },
                         }}
                     >
                         Create Group
@@ -1325,19 +1445,19 @@ export function ChatPage() {
                 }}
                 PaperProps={{
                     sx: {
-                        bgcolor: '#0b0d13',
-                        border: '1px solid #252b3c',
+                        bgcolor: '#050505',
+                        border: '1px solid #333333',
                         borderRadius: 2,
                         minWidth: 380,
                     },
                 }}
             >
-                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
+                <DialogTitle sx={{ color: '#ffffff', fontWeight: 700, fontSize: '1rem' }}>
                     Add members to {selectedChannel?.name || 'channel'}
                 </DialogTitle>
                 <DialogContent>
                     {availableMembersToAdd.length === 0 ? (
-                        <Typography variant="body2" sx={{ color: '#7b84a0', py: 2 }}>
+                        <Typography variant="body2" sx={{ color: '#666666', py: 2 }}>
                             Everyone in this organization is already in this channel.
                         </Typography>
                     ) : (
@@ -1361,13 +1481,13 @@ export function ChatPage() {
                                                     }
                                                 }}
                                                 sx={{
-                                                    color: '#5f6881',
-                                                    '&.Mui-checked': { color: '#5865F2' },
+                                                    color: '#666666',
+                                                    '&.Mui-checked': { color: '#ffffff' },
                                                 }}
                                             />
                                         }
                                         label={
-                                            <Typography variant="body2" sx={{ color: '#d8deee' }}>
+                                            <Typography variant="body2" sx={{ color: '#ffffff' }}>
                                                 {member.name}
                                             </Typography>
                                         }
@@ -1383,7 +1503,7 @@ export function ChatPage() {
                             setAddMembersOpen(false);
                             setSelectedInviteMemberIds([]);
                         }}
-                        sx={{ color: '#7782a1', textTransform: 'none' }}
+                        sx={{ color: '#858585', textTransform: 'none' }}
                     >
                         Cancel
                     </Button>
@@ -1392,12 +1512,12 @@ export function ChatPage() {
                         disabled={selectedInviteMemberIds.length === 0}
                         variant="contained"
                         sx={{
-                            bgcolor: '#5865F2',
-                            color: '#fff',
+                            bgcolor: '#ffffff',
+                            color: '#000000',
                             textTransform: 'none',
                             fontWeight: 600,
-                            '&:hover': { bgcolor: '#4c59de' },
-                            '&.Mui-disabled': { bgcolor: '#2d3550', color: '#647092' },
+                            '&:hover': { bgcolor: '#e0e0e0' },
+                            '&.Mui-disabled': { bgcolor: '#333333', color: '#666666' },
                         }}
                     >
                         Add Members

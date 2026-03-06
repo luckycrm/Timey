@@ -12,6 +12,7 @@ import GroupAddRoundedIcon from '@mui/icons-material/GroupAddRounded';
 import SearchIcon from '@mui/icons-material/Search';
 import TagRoundedIcon from '@mui/icons-material/TagRounded';
 import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded';
+import { chatColors } from '../../theme/chatColors';
 
 interface ChatChannel {
     id: bigint;
@@ -123,14 +124,15 @@ export function ChatSidebar({
                     onClick={onNewChat}
                     fullWidth
                     sx={{
-                        bgcolor: '#ffffff',
-                        color: '#000000',
+                        bgcolor: chatColors.actionBg,
+                        color: chatColors.actionText,
                         textTransform: 'none',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: '0.76rem',
                         borderRadius: 1.5,
-                        height: 36,
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                        height: 34,
+                        whiteSpace: 'nowrap',
+                        '&:hover': { bgcolor: chatColors.actionBgHover },
                     }}
                 >
                     New Chat
@@ -141,14 +143,16 @@ export function ChatSidebar({
                     onClick={onNewGroup}
                     fullWidth
                     sx={{
-                        borderColor: '#333',
-                        color: '#858585',
+                        borderColor: '#222',
+                        color: chatColors.textPrimary,
+                        bgcolor: chatColors.hoverSoft,
                         textTransform: 'none',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: '0.76rem',
                         borderRadius: 1.5,
-                        height: 36,
-                        '&:hover': { borderColor: '#555', color: '#fff' },
+                        height: 34,
+                        whiteSpace: 'nowrap',
+                        '&:hover': { borderColor: chatColors.borderStrong, color: chatColors.textPrimary, bgcolor: chatColors.hover },
                     }}
                 >
                     New Group
@@ -158,35 +162,35 @@ export function ChatSidebar({
             {/* Search */}
             <Box
                 sx={{
-                    bgcolor: '#111',
+                    bgcolor: chatColors.inputBg,
                     borderRadius: 1.5,
                     px: 1.5,
                     py: 0.6,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1,
-                    border: '1px solid #1a1a1a',
+                    border: `1px solid ${chatColors.border}`,
                     mb: 2,
-                    '&:focus-within': { borderColor: '#444' },
+                    '&:focus-within': { borderColor: chatColors.borderHover },
                 }}
             >
-                <SearchIcon sx={{ fontSize: 16, color: '#555' }} />
+                <SearchIcon sx={{ fontSize: 16, color: chatColors.textFaint }} />
                 <InputBase
                     placeholder="Search chats..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     fullWidth
-                    sx={{ color: '#fff', fontSize: '0.8rem' }}
+                    sx={{ color: chatColors.textPrimary, fontSize: '0.8rem' }}
                 />
             </Box>
 
-            <Divider sx={{ borderColor: '#1a1a1a', mb: 1 }} />
+            <Divider sx={{ borderColor: chatColors.border, mb: 1 }} />
 
             {/* Channel List */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', mx: -0.5 }}>
                 {filteredChannels.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography variant="caption" sx={{ color: '#555' }}>
+                        <Typography variant="caption" sx={{ color: chatColors.textFaint }}>
                             {search ? 'No results found' : 'No conversations yet'}
                         </Typography>
                     </Box>
@@ -196,7 +200,7 @@ export function ChatSidebar({
                             <Typography
                                 variant="caption"
                                 sx={{
-                                    color: '#666',
+                                    color: chatColors.textMuted,
                                     fontWeight: 700,
                                     px: 1.5,
                                     mb: 0.75,
@@ -228,9 +232,9 @@ export function ChatSidebar({
                                                 py: 0.9,
                                                 borderRadius: 1.5,
                                                 cursor: 'pointer',
-                                                bgcolor: isSelected ? 'rgba(88,101,242,0.22)' : 'transparent',
+                                                bgcolor: isSelected ? chatColors.selection : 'transparent',
                                                 '&:hover': {
-                                                    bgcolor: isSelected ? 'rgba(88,101,242,0.3)' : 'rgba(255,255,255,0.04)',
+                                                    bgcolor: isSelected ? chatColors.selectionStrong : chatColors.hover,
                                                 },
                                                 transition: 'all 0.15s',
                                             }}
@@ -240,8 +244,8 @@ export function ChatSidebar({
                                                     sx={{
                                                         width: 30,
                                                         height: 30,
-                                                        bgcolor: '#1f2a38',
-                                                        color: '#d6e4ff',
+                                                        bgcolor: chatColors.border,
+                                                        color: chatColors.textPrimary,
                                                         fontSize: '0.75rem',
                                                         fontWeight: 700,
                                                     }}
@@ -257,8 +261,8 @@ export function ChatSidebar({
                                                             width: 10,
                                                             height: 10,
                                                             borderRadius: '50%',
-                                                            bgcolor: '#38c872',
-                                                            border: '2px solid #000',
+                                                            bgcolor: chatColors.success,
+                                                            border: `2px solid ${chatColors.pageBg}`,
                                                         }}
                                                     />
                                                 )}
@@ -269,7 +273,7 @@ export function ChatSidebar({
                                                         variant="body2"
                                                         sx={{
                                                             fontWeight: isSelected ? 700 : 500,
-                                                            color: isSelected ? '#fff' : '#d0d0d0',
+                                                            color: isSelected ? chatColors.textPrimary : '#d0d0d0',
                                                             fontSize: '0.82rem',
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',
@@ -279,7 +283,7 @@ export function ChatSidebar({
                                                         {(peer?.name || channel.name)}
                                                     </Typography>
                                                     {lastMsg && (
-                                                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.65rem' }}>
+                                                        <Typography variant="caption" sx={{ color: chatColors.textMuted, fontSize: '0.65rem' }}>
                                                             {formatRelativeTime(lastMsg.created_at)}
                                                         </Typography>
                                                     )}
@@ -288,7 +292,7 @@ export function ChatSidebar({
                                                     <Typography
                                                         variant="caption"
                                                         sx={{
-                                                            color: unreadCount > 0 ? '#dce6ff' : '#666',
+                                                            color: unreadCount > 0 ? chatColors.textPrimary : chatColors.textMuted,
                                                             fontSize: '0.69rem',
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',
@@ -308,8 +312,8 @@ export function ChatSidebar({
                                                     sx={{
                                                         height: 18,
                                                         fontSize: '0.65rem',
-                                                        bgcolor: '#e33d4f',
-                                                        color: '#fff',
+                                                        bgcolor: chatColors.danger,
+                                                        color: chatColors.textPrimary,
                                                         fontWeight: 700,
                                                         '& .MuiChip-label': { px: 0.7 },
                                                     }}
@@ -325,7 +329,7 @@ export function ChatSidebar({
                             <Typography
                                 variant="caption"
                                 sx={{
-                                    color: '#666',
+                                    color: chatColors.textMuted,
                                     fontWeight: 700,
                                     px: 1.5,
                                     mb: 0.75,
@@ -355,21 +359,21 @@ export function ChatSidebar({
                                                 py: 0.75,
                                                 borderRadius: 1.5,
                                                 cursor: 'pointer',
-                                                bgcolor: isSelected ? 'rgba(88,101,242,0.22)' : 'transparent',
+                                                bgcolor: isSelected ? chatColors.selection : 'transparent',
                                                 '&:hover': {
-                                                    bgcolor: isSelected ? 'rgba(88,101,242,0.3)' : 'rgba(255,255,255,0.04)',
+                                                    bgcolor: isSelected ? chatColors.selectionStrong : chatColors.hover,
                                                 },
                                                 transition: 'all 0.15s',
                                             }}
                                         >
-                                            <TagRoundedIcon sx={{ fontSize: 17, color: isSelected ? '#fff' : '#888' }} />
+                                            <TagRoundedIcon sx={{ fontSize: 17, color: isSelected ? chatColors.textPrimary : '#888' }} />
                                             <Box sx={{ flex: 1, minWidth: 0 }}>
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
                                                     <Typography
                                                         variant="body2"
                                                         sx={{
                                                             fontWeight: unreadCount > 0 || isSelected ? 700 : 500,
-                                                            color: isSelected ? '#fff' : unreadCount > 0 ? '#dce6ff' : '#b8b8b8',
+                                                            color: isSelected ? chatColors.textPrimary : unreadCount > 0 ? chatColors.textPrimary : '#b8b8b8',
                                                             fontSize: '0.82rem',
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',
@@ -380,7 +384,7 @@ export function ChatSidebar({
                                                     </Typography>
                                                     <Stack direction="row" spacing={0.6} alignItems="center">
                                                         {lastMsg && (
-                                                            <Typography variant="caption" sx={{ color: '#666', fontSize: '0.65rem' }}>
+                                                            <Typography variant="caption" sx={{ color: chatColors.textMuted, fontSize: '0.65rem' }}>
                                                                 {formatRelativeTime(lastMsg.created_at)}
                                                             </Typography>
                                                         )}
@@ -391,8 +395,8 @@ export function ChatSidebar({
                                                                 sx={{
                                                                     height: 18,
                                                                     fontSize: '0.65rem',
-                                                                    bgcolor: '#5865F2',
-                                                                    color: '#fff',
+                                                                    bgcolor: chatColors.actionBg,
+                                                                    color: chatColors.actionText,
                                                                     fontWeight: 700,
                                                                     '& .MuiChip-label': { px: 0.7 },
                                                                 }}
@@ -404,7 +408,7 @@ export function ChatSidebar({
                                                     <Typography
                                                         variant="caption"
                                                         sx={{
-                                                            color: '#666',
+                                                            color: chatColors.textMuted,
                                                             fontSize: '0.69rem',
                                                             overflow: 'hidden',
                                                             textOverflow: 'ellipsis',

@@ -14,6 +14,7 @@ const HOST =
   'https://maincloud.spacetimedb.com';
 const DB_NAME = import.meta.env.VITE_SPACETIMEDB_DB_NAME ?? 'timeydb';
 const TOKEN_KEY = `${HOST}/${DB_NAME}/auth_token`;
+const CHAT_DRAFT_PREFIX = 'timey-chat-draft-';
 
 // Safe localStorage helpers for SSR (Node.js 22+ has a localStorage stub that throws)
 function getStoredToken(): string | undefined {
@@ -38,6 +39,10 @@ export function clearStoredToken(): void {
   } catch {
     // SSR - ignore
   }
+}
+
+export function hasStoredToken(): boolean {
+  return getStoredToken() !== undefined;
 }
 
 const spacetimeDBQueryClient = new SpacetimeDBQueryClient();
@@ -79,6 +84,40 @@ const connectionBuilder = DbConnection.builder()
   .onConnect(onConnect)
   .onDisconnect(onDisconnect)
   .onConnectError(onConnectError);
+
+interface ResetClientStateOptions {
+  clearSpacetimeToken?: boolean;
+}
+
+export function resetClientState(
+  options: ResetClientStateOptions = {}
+): void {
+  const { clearSpacetimeToken = true } = options;
+
+  if (clearSpacetimeToken) {
+    clearStoredToken();
+  }
+
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CHAT_DRAFT_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // SSR - ignore
+  }
+
+  // Reset all cached realtime query data/subscriptions between identities.
+  spacetimeDBQueryClient.disconnect();
+  queryClient.clear();
+  spacetimeDBQueryClient.connect(queryClient);
+}
 
 export function getRouter() {
   const router = createTanStackRouter({

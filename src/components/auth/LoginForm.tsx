@@ -7,10 +7,10 @@ import Stack from '@mui/material/Stack';
 import Link from '@mui/material/Link';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
-import { useNavigate } from '@tanstack/react-router';
 import { useReducer, useSpacetimeDB } from 'spacetimedb/tanstack';
 import { reducers } from '../../module_bindings';
-import { requestOtp, verifyOtp } from '../../server/otp';
+import { requestOtp, verifyOtp, logout as clearServerSession } from '../../server/otp';
+import { hasStoredToken, resetClientState } from '../../router';
 import { AppLogo } from '../common/AppLogo';
 import { toast } from 'sonner';
 
@@ -19,8 +19,8 @@ export function LoginForm() {
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
+    const [sessionResetting, setSessionResetting] = useState(true);
     const [resendTimer, setResendTimer] = useState(0);
-    const navigate = useNavigate();
 
     const conn = useSpacetimeDB();
     const registerUser = useReducer(reducers.registerUser);
@@ -29,6 +29,40 @@ export function LoginForm() {
     const isVerifyingOtpRef = useRef(false);
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const resetBeforeLogin = async () => {
+            const shouldForceFreshReload =
+                typeof window !== 'undefined' &&
+                new URLSearchParams(window.location.search).get('fresh') !== '1' &&
+                hasStoredToken();
+
+            resetClientState({ clearSpacetimeToken: true });
+
+            try {
+                await clearServerSession();
+            } catch {
+                // Best-effort cookie reset.
+            }
+
+            if (shouldForceFreshReload && typeof window !== 'undefined') {
+                window.location.replace('/login?fresh=1');
+                return;
+            }
+
+            if (!cancelled) {
+                setSessionResetting(false);
+            }
+        };
+
+        void resetBeforeLogin();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (step === 'otp') {
@@ -49,7 +83,7 @@ export function LoginForm() {
 
     const handleRequestOtp = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!normalizedEmail || loading || isRequestingOtpRef.current) return;
+        if (!normalizedEmail || loading || sessionResetting || isRequestingOtpRef.current) return;
 
         isRequestingOtpRef.current = true;
         setLoading(true);
@@ -105,7 +139,7 @@ export function LoginForm() {
 
     const handleVerifyOtp = async (code?: string) => {
         const otpCode = (code || otp.join('')).replace(/\D/g, '').slice(0, 6);
-        if (otpCode.length !== 6 || loading || isVerifyingOtpRef.current) return;
+        if (otpCode.length !== 6 || loading || sessionResetting || isVerifyingOtpRef.current) return;
 
         isVerifyingOtpRef.current = true;
         setLoading(true);
@@ -127,7 +161,12 @@ export function LoginForm() {
                     }
                 }
                 toast.success('Verified. Opening your workspace…');
-                setTimeout(() => navigate({ to: '/' }), 420);
+                resetClientState({ clearSpacetimeToken: false });
+                setTimeout(() => {
+                    if (typeof window !== 'undefined') {
+                        window.location.replace('/');
+                    }
+                }, 160);
             } else {
                 toast.error(result.error || 'Invalid code');
                 setOtp(['', '', '', '', '', '']);
@@ -142,7 +181,7 @@ export function LoginForm() {
     };
 
     const handleResend = async () => {
-        if (resendTimer > 0 || loading || isRequestingOtpRef.current) return;
+        if (resendTimer > 0 || loading || sessionResetting || isRequestingOtpRef.current) return;
         setOtp(['', '', '', '', '', '']);
         isRequestingOtpRef.current = true;
         setLoading(true);
@@ -160,6 +199,14 @@ export function LoginForm() {
             setLoading(false);
         }
     };
+
+    if (sessionResetting) {
+        return (
+            <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: '#000000' }}>
+                <CircularProgress size={24} sx={{ color: '#ffffff' }} />
+            </Box>
+        );
+    }
 
     return (
         <Box
