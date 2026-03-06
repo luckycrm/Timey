@@ -31,7 +31,7 @@
     "zeptomail": "^7.0.2"
   },
   "devDependencies": {
-    "@types/node": "^22.5.4",
+    "@types/node": "^25.3.5",
     "@vitejs/plugin-react": "^4.3.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
