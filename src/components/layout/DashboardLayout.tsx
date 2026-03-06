@@ -680,8 +680,33 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
             }
         }
 
+        const isAway =
+            document.visibilityState !== 'visible' ||
+            !document.hasFocus() ||
+            currentPresence?.status === 'away';
+
+        if (isAway && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const newestIncoming = [...incoming]
+                .reverse()
+                .find((message) => message.createdAt > lastNotifiedMessageAtRef.current) || null;
+
+            const showSystemNotification = async () => {
+                if (!newestIncoming) return;
+
+                const senderName = userById.get(String(newestIncoming.senderId))?.name || 'New message';
+                const channel = channels.find((row) => row.id === newestIncoming.channelId) || null;
+                const isGroup = channel?.type !== 'dm';
+                const title = isGroup ? `#${channel?.name || 'Channel'}` : senderName;
+                const bodySource = newestIncoming.content.trim() || 'Sent you a message';
+                const body = bodySource.length > 120 ? `${bodySource.slice(0, 117)}...` : bodySource;
+                await triggerSystemNotification(title, body, `timey-chat-${String(newestIncoming.channelId)}`);
+            };
+
+            void showSystemNotification();
+        }
+
         lastNotifiedMessageAtRef.current = newestIncomingAt;
-    }, [currentDbUser, location.pathname, messages, myChannelIds]);
+    }, [channels, currentDbUser, currentPresence?.status, location.pathname, messages, myChannelIds, navigate, userById]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -770,6 +795,71 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
 
     const handleUserMenuClose = () => {
         setUserMenuAnchor(null);
+    };
+
+    const triggerSystemNotification = async (title: string, body: string, tag: string): Promise<boolean> => {
+        if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
+        if (!window.isSecureContext || Notification.permission !== 'granted') return false;
+
+        return await new Promise<boolean>((resolve) => {
+            let settled = false;
+            try {
+                const notification = new Notification(title, {
+                    body,
+                    tag,
+                    renotify: true,
+                    requireInteraction: true,
+                    silent: false,
+                });
+
+                const finish = (ok: boolean) => {
+                    if (settled) return;
+                    settled = true;
+                    resolve(ok);
+                };
+
+                notification.onshow = () => finish(true);
+                notification.onerror = () => finish(false);
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                    void navigate({ to: '/chat' });
+                };
+
+                window.setTimeout(() => notification.close(), 10_000);
+                window.setTimeout(() => finish(false), 1500);
+            } catch {
+                resolve(false);
+            }
+        });
+    };
+
+    const handleNotificationsClick = () => {
+        if (typeof window === 'undefined' || typeof Notification === 'undefined') {
+            toast.error('System notifications are not supported in this browser.');
+            return;
+        }
+        if (!window.isSecureContext) {
+            toast.error('Notifications require a secure context (HTTPS or localhost).');
+            return;
+        }
+        if (Notification.permission === 'granted') {
+            toast.success('System notifications already enabled.');
+            return;
+        }
+        void Notification.requestPermission()
+            .then((permission) => {
+                if (permission === 'granted') {
+                    toast.success('System notifications enabled.');
+                } else if (permission === 'denied') {
+                    toast.error('Notifications blocked. Enable them in browser settings.');
+                } else {
+                    toast.message('Notification permission was dismissed.');
+                }
+            })
+            .catch(() => {
+                toast.error('Could not request notification permission.');
+            });
     };
 
     const dockVisible = !location.pathname.startsWith('/chat');
@@ -1016,7 +1106,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
 
                     {/* Actions */}
                     <Stack direction="row" spacing={1} alignItems="center">
-                        <IconButton size="small" sx={{ color: '#858585' }}>
+                        <IconButton size="small" sx={{ color: '#858585' }} onClick={handleNotificationsClick}>
                             <NotificationsNoneOutlinedIcon sx={{ fontSize: 20 }} />
                         </IconButton>
                         <IconButton size="small" sx={{ color: '#858585' }}>
