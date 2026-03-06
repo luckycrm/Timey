@@ -1,29 +1,83 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Tooltip from '@mui/material/Tooltip';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import AddReactionRoundedIcon from '@mui/icons-material/AddReactionRounded';
+import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded';
 
 interface MessageInputProps {
-    onSend: (content: string) => void;
+    onSend: (content: string) => Promise<void> | void;
+    channelId: bigint | null;
     disabled?: boolean;
     channelName?: string;
+    onTypingChange?: (typing: boolean) => void;
 }
 
-export function MessageInput({ onSend, disabled = false, channelName = 'channel' }: MessageInputProps) {
-    const [value, setValue] = useState('');
+const QUICK_EMOJIS = ['🔥', '👍', '✅', '🎉', '👀'];
+const MAX_MESSAGE_LENGTH = 2000;
 
-    const handleSend = () => {
+export function MessageInput({
+    onSend,
+    channelId,
+    disabled = false,
+    channelName = 'channel',
+    onTypingChange,
+}: MessageInputProps) {
+    const [value, setValue] = useState('');
+    const [sending, setSending] = useState(false);
+
+    const draftStorageKey = useMemo(() => {
+        return channelId === null ? null : `timey-chat-draft-${String(channelId)}`;
+    }, [channelId]);
+
+    useEffect(() => {
+        if (draftStorageKey == null || typeof window === 'undefined') {
+            setValue('');
+            return;
+        }
+        const saved = window.localStorage.getItem(draftStorageKey);
+        setValue(saved ?? '');
+    }, [draftStorageKey]);
+
+    useEffect(() => {
+        if (draftStorageKey == null || typeof window === 'undefined') return;
+        if (value.trim()) {
+            window.localStorage.setItem(draftStorageKey, value);
+        } else {
+            window.localStorage.removeItem(draftStorageKey);
+        }
+    }, [draftStorageKey, value]);
+
+    useEffect(() => {
+        onTypingChange?.(value.trim().length > 0);
+    }, [onTypingChange, value]);
+
+    const handleSend = async () => {
         const trimmed = value.trim();
-        if (!trimmed) return;
-        onSend(trimmed);
-        setValue('');
+        if (!trimmed || sending || trimmed.length > MAX_MESSAGE_LENGTH) return;
+        setSending(true);
+        try {
+            await onSend(trimmed);
+            setValue('');
+            if (draftStorageKey && typeof window !== 'undefined') {
+                window.localStorage.removeItem(draftStorageKey);
+            }
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleSend();
+            void handleSend();
+        }
+        if (e.key === 'Escape') {
+            setValue('');
         }
     };
 
@@ -45,10 +99,19 @@ export function MessageInput({ onSend, disabled = false, channelName = 'channel'
                     alignItems: 'flex-end',
                     gap: 1,
                     border: '1px solid #222',
-                    '&:focus-within': { borderColor: '#444' },
+                    '&:focus-within': { borderColor: '#5865F2' },
                     transition: 'border-color 0.2s',
                 }}
             >
+                <Tooltip title="Mention someone">
+                    <IconButton
+                        size="small"
+                        onClick={() => setValue((curr) => `${curr}@`)}
+                        sx={{ color: '#666', mt: 0.2 }}
+                    >
+                        <AlternateEmailRoundedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                </Tooltip>
                 <InputBase
                     placeholder={`Message #${channelName}...`}
                     value={value}
@@ -65,18 +128,39 @@ export function MessageInput({ onSend, disabled = false, channelName = 'channel'
                         '& textarea': { padding: 0 },
                     }}
                 />
+                <Stack direction="row" spacing={0.4} alignItems="center" sx={{ pb: 0.1 }}>
+                    {QUICK_EMOJIS.map((emoji) => (
+                        <IconButton
+                            key={emoji}
+                            size="small"
+                            onClick={() => setValue((curr) => `${curr}${emoji}`)}
+                            sx={{
+                                color: '#777',
+                                width: 22,
+                                height: 22,
+                                fontSize: '0.8rem',
+                                '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+                            }}
+                        >
+                            {emoji}
+                        </IconButton>
+                    ))}
+                    <IconButton size="small" disabled sx={{ color: '#444', width: 22, height: 22 }}>
+                        <AddReactionRoundedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                </Stack>
                 <IconButton
-                    onClick={handleSend}
-                    disabled={disabled || !value.trim()}
+                    onClick={() => void handleSend()}
+                    disabled={disabled || sending || !value.trim() || value.trim().length > MAX_MESSAGE_LENGTH}
                     sx={{
                         color: value.trim() ? '#fff' : '#555',
-                        bgcolor: value.trim() ? '#0070f3' : 'transparent',
+                        bgcolor: value.trim() ? '#5865F2' : 'transparent',
                         width: 32,
                         height: 32,
                         borderRadius: 1.5,
                         transition: 'all 0.2s',
                         '&:hover': {
-                            bgcolor: value.trim() ? '#0060d3' : 'rgba(255,255,255,0.05)',
+                            bgcolor: value.trim() ? '#4c59de' : 'rgba(255,255,255,0.05)',
                         },
                         '&.Mui-disabled': { color: '#333' },
                     }}
@@ -84,6 +168,20 @@ export function MessageInput({ onSend, disabled = false, channelName = 'channel'
                     <SendRoundedIcon sx={{ fontSize: 18 }} />
                 </IconButton>
             </Box>
+            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75, px: 0.25 }}>
+                <Typography variant="caption" sx={{ color: '#666', fontSize: '0.67rem' }}>
+                    Press Enter to send, Shift+Enter for newline
+                </Typography>
+                <Typography
+                    variant="caption"
+                    sx={{
+                        color: value.length > MAX_MESSAGE_LENGTH ? '#f85149' : '#666',
+                        fontSize: '0.67rem',
+                    }}
+                >
+                    {value.length}/{MAX_MESSAGE_LENGTH}
+                </Typography>
+            </Stack>
         </Box>
     );
 }

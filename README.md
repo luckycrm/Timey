@@ -1,5 +1,7 @@
 # Timey
 
+![Timey Logo](./assets/timeylogo.png)
+
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-2ea44f.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
@@ -19,6 +21,10 @@ It combines passwordless access, organization onboarding, member management, and
 - Realtime collaboration powered by SpacetimeDB
 - Global time awareness for distributed teams
 - Clean TypeScript-first codebase ready for open-source contribution
+
+## Screenshots
+
+![Login](./assets/login.png)
 
 ## Product Direction
 

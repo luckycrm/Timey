@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 
 interface Message {
     id: bigint;
@@ -16,6 +18,8 @@ interface MessageListProps {
     messages: Message[];
     users: any[];
     currentUserId: bigint | null;
+    currentUserName?: string;
+    searchTerm?: string;
 }
 
 function formatTime(timestamp: bigint): string {
@@ -34,12 +38,24 @@ function formatDateHeader(timestamp: bigint): string {
     return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-export function MessageList({ messages, users, currentUserId }: MessageListProps) {
+export function MessageList({
+    messages,
+    users,
+    currentUserId,
+    currentUserName = '',
+    searchTerm = '',
+}: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isNearBottom, setIsNearBottom] = useState(true);
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages.length]);
+        if (isNearBottom) {
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [isNearBottom, messages.length]);
 
     const sortedMessages = [...messages].sort((a, b) => Number(a.created_at) - Number(b.created_at));
 
@@ -59,11 +75,75 @@ export function MessageList({ messages, users, currentUserId }: MessageListProps
         groups[groups.length - 1].messages.push(msg);
     }
 
-    if (sortedMessages.length === 0) {
+    const renderContent = (content: string) => {
+        const pieces = content.split(/(https?:\/\/[^\s]+)/g);
+        return pieces.map((piece, pieceIndex) => {
+            const isUrl = /^https?:\/\/[^\s]+$/i.test(piece);
+            if (isUrl) {
+                return (
+                    <Box
+                        key={`url-${pieceIndex}`}
+                        component="a"
+                        href={piece}
+                        target="_blank"
+                        rel="noreferrer"
+                        sx={{ color: '#74a7ff', textDecoration: 'underline', wordBreak: 'break-all' }}
+                    >
+                        {piece}
+                    </Box>
+                );
+            }
+
+            const words = piece.split(/(\s+)/);
+            return words.map((word, wordIndex) => {
+                const mentionTarget = `@${currentUserName.replace(/\s+/g, '').toLowerCase()}`;
+                const normalizedWord = word.toLowerCase();
+                const isMention = normalizedWord.startsWith('@');
+                const isOwnMention =
+                    mentionTarget.length > 1 &&
+                    normalizedWord.includes(mentionTarget);
+                const hasSearchHit =
+                    normalizedSearch.length > 0 &&
+                    normalizedWord.includes(normalizedSearch);
+
+                return (
+                    <Box
+                        key={`token-${pieceIndex}-${wordIndex}`}
+                        component="span"
+                        sx={{
+                            ...(isMention && {
+                                color: isOwnMention ? '#ffcf70' : '#9bb8ff',
+                                bgcolor: isOwnMention ? 'rgba(255, 204, 102, 0.15)' : 'rgba(88, 101, 242, 0.16)',
+                                borderRadius: 0.8,
+                                px: 0.35,
+                                fontWeight: 600,
+                            }),
+                            ...(hasSearchHit && {
+                                bgcolor: 'rgba(251, 188, 4, 0.26)',
+                                borderRadius: 0.7,
+                            }),
+                        }}
+                    >
+                        {word}
+                    </Box>
+                );
+            });
+        });
+    };
+
+    const onScroll = () => {
+        const node = containerRef.current;
+        if (!node) return;
+        const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+        setIsNearBottom(distance < 60);
+    };
+
+    const hasResults = sortedMessages.length > 0;
+    if (!hasResults) {
         return (
             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography variant="body2" sx={{ color: '#555' }}>
-                    No messages yet. Start the conversation! 💬
+                    {normalizedSearch ? 'No messages match your search.' : 'No messages yet. Start the conversation!'}
                 </Typography>
             </Box>
         );
@@ -79,7 +159,10 @@ export function MessageList({ messages, users, currentUserId }: MessageListProps
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 0.5,
+                position: 'relative',
             }}
+            ref={containerRef}
+            onScroll={onScroll}
         >
             {groups.map((group) => (
                 <Box key={group.date}>
@@ -123,7 +206,7 @@ export function MessageList({ messages, users, currentUserId }: MessageListProps
                                     py: showAvatar ? 0.8 : 0.15,
                                     px: 1,
                                     borderRadius: 1,
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' },
                                 }}
                             >
                                 {/* Avatar column */}
@@ -172,9 +255,10 @@ export function MessageList({ messages, users, currentUserId }: MessageListProps
                                             fontSize: '0.85rem',
                                             lineHeight: 1.5,
                                             wordBreak: 'break-word',
+                                            whiteSpace: 'pre-wrap',
                                         }}
                                     >
-                                        {msg.content}
+                                        {renderContent(msg.content)}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -183,6 +267,27 @@ export function MessageList({ messages, users, currentUserId }: MessageListProps
                 </Box>
             ))}
             <div ref={bottomRef} />
+            {!isNearBottom && (
+                <Button
+                    size="small"
+                    onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    startIcon={<KeyboardArrowDownRoundedIcon />}
+                    sx={{
+                        position: 'sticky',
+                        bottom: 10,
+                        alignSelf: 'center',
+                        bgcolor: '#5865F2',
+                        color: '#fff',
+                        textTransform: 'none',
+                        borderRadius: 4,
+                        px: 1.5,
+                        minHeight: 30,
+                        '&:hover': { bgcolor: '#4c59de' },
+                    }}
+                >
+                    Jump to present
+                </Button>
+            )}
         </Box>
     );
 }
