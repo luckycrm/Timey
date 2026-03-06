@@ -127,6 +127,29 @@ spacetimedb/
 - [ ] Time entries, attendance, and reporting
 - [ ] Role-based permissions and audit trails
 
+## Implementation Status (March 6, 2026)
+
+### Done
+
+- Chat page supports threaded replies, reactions, message editing, mentions, emoji picker, and read-state sync.
+- Global right-side messenger panel is available outside `/chat`.
+- Messenger supports both direct messages and group channels.
+- Floating chat windows open from the messenger panel.
+- Maximum 2 floating chat windows are kept open; opening a third replaces the oldest open window.
+- Floating thread view now opens as a full thread screen in the same chat card with a top back button.
+- Online/offline presence is global (not only `/chat`) via SpacetimeDB heartbeat updates.
+- Topbar user profile shows live online/offline status.
+- Incoming message sound plays when user is away from active chat context.
+- System notifications for incoming messages work when user is away and notification permission is granted.
+- Message input and message list UI in floating chat are aligned with shared chat components.
+
+### To Do
+
+- Closed-tab/browser push notifications (requires Service Worker + Push API + backend Web Push).
+- Notification preferences UI (sound on/off, desktop notification toggle, channel-level controls).
+- Additional mobile refinements for floating messenger behavior.
+- More chat QA coverage for reconnect/offline/online transitions and multi-account switching.
+
 ## Contributors
 
 - [@luckycrm](https://github.com/luckycrm)
