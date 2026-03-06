@@ -1,0 +1,20 @@
+{
+  "name": "timey",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "spacetime build",
+    "publish": "spacetime publish"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "spacetimedb": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/object-inspect": "^1.13.0",
+    "@types/statuses": "^2.0.6",
+    "typescript": "^5.9.3"
+  }
+}
