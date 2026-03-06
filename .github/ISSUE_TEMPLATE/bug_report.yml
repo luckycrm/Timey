@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible bug
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+      placeholder: A clear and concise summary
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include exact steps and inputs
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. Enter ...
+        4. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, Bun version, and any relevant env setup
+      placeholder: Chrome 123, macOS, Bun 1.x
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs/screenshots
+      description: Paste logs or attach screenshots
