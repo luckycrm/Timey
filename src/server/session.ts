@@ -1,8 +1,13 @@
 import { createHmac } from 'crypto';
 
-const SESSION_SECRET =
-    process.env.SESSION_SECRET || 'timey-dev-secret-change-in-production';
+const SESSION_SECRET = process.env.SESSION_SECRET;
 const COOKIE_NAME = 'timey_session';
+
+if (!SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required');
+}
+
+const secret: string = SESSION_SECRET;
 
 export interface SessionData {
     email: string;
@@ -11,7 +16,7 @@ export interface SessionData {
 }
 
 function sign(data: string): string {
-    return createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+    return createHmac('sha256', secret).update(data).digest('hex');
 }
 
 export function createSessionToken(email: string): string {

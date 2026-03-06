@@ -1,47 +1,50 @@
 import { createServerFn } from '@tanstack/react-start';
 import { SendMailClient } from 'zeptomail';
 
-const ZEPTOMAIL_URL = 'https://api.zeptomail.com/v1.1/email';
-const ZEPTOMAIL_TOKEN =
-    process.env.ZEPTOMAIL_TOKEN ||
-    'Zoho-enczapikey wSsVR61z/EKmX68pmj2kJOw6kFoEUVrxHUoo0Frz73/+GK/KosdtxBLHAATySPEXRGZtE2MVoL4tnUgG2mIGiox5m1tSDCiF9mqRe1U4J3x17qnvhDzMX2pdlhSKKIMMwA1rmGRmGskq+g==';
+const ZEPTOMAIL_URL = process.env.ZEPTOMAIL_URL || 'https://api.zeptomail.com/v1.1/email';
+const ZEPTOMAIL_TOKEN = process.env.ZEPTOMAIL_TOKEN;
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@timey.app';
+
+if (!ZEPTOMAIL_TOKEN) {
+  throw new Error('ZEPTOMAIL_TOKEN environment variable is required');
+}
 
 const mailClient = new SendMailClient({
-    url: ZEPTOMAIL_URL,
-    token: ZEPTOMAIL_TOKEN,
+  url: ZEPTOMAIL_URL,
+  token: ZEPTOMAIL_TOKEN,
 });
 
 /**
  * Send an invitation email to a new employee.
  */
 export const sendInviteEmail = createServerFn({ method: 'POST' })
-    .handler(async (ctx) => {
-        const { email, orgName, token } = (ctx.data as any) as {
-            email: string;
-            orgName: string;
-            token: string;
-        };
+  .handler(async (ctx) => {
+    const { email, orgName, token } = (ctx.data as any) as {
+      email: string;
+      orgName: string;
+      token: string;
+    };
 
-        if (!email || !email.includes('@')) {
-            return { success: false, error: 'Invalid email address' };
-        }
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Invalid email address' };
+    }
 
-        try {
-            await mailClient.sendMail({
-                from: {
-                    address: 'noreply@bootserp.com',
-                    name: 'Timey',
-                },
-                to: [
-                    {
-                        email_address: {
-                            address: email,
-                            name: email.split('@')[0],
-                        },
-                    },
-                ],
-                subject: `You've been invited to join ${orgName} on Timey`,
-                htmlbody: `
+    try {
+      await mailClient.sendMail({
+        from: {
+          address: SENDER_EMAIL,
+          name: 'Timey',
+        },
+        to: [
+          {
+            email_address: {
+              address: email,
+              name: email.split('@')[0],
+            },
+          },
+        ],
+        subject: `You've been invited to join ${orgName} on Timey`,
+        htmlbody: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; border: 1px solid #eee; border-radius: 16px;">
             <h2 style="color: #1a1a2e; margin-bottom: 16px;">You're invited!</h2>
             <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
@@ -66,12 +69,12 @@ export const sendInviteEmail = createServerFn({ method: 'POST' })
             </p>
           </div>
         `,
-            });
+      });
 
-            console.log(`Invitation email sent to ${email} for Org ${orgName}`);
-            return { success: true };
-        } catch (error) {
-            console.error('Failed to send invitation email:', error);
-            return { success: false, error: 'Failed to deliver email' };
-        }
-    });
+      console.log(`Invitation email sent to ${email} for Org ${orgName}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to send invitation email:', error);
+      return { success: false, error: 'Failed to deliver email' };
+    }
+  });

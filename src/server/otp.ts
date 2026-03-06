@@ -41,10 +41,13 @@ function normalizeCode(code: string): string {
 }
 
 // ─── ZeptoMail Client ────────────────────────────────────────────────
-const ZEPTOMAIL_URL = 'https://api.zeptomail.com/v1.1/email';
-const ZEPTOMAIL_TOKEN =
-    process.env.ZEPTOMAIL_TOKEN ||
-    'Zoho-enczapikey wSsVR61z/EKmX68pmj2kJOw6kFoEUVrxHUoo0Frz73/+GK/KosdtxBLHAATySPEXRGZtE2MVoL4tnUgG2mIGiox5m1tSDCiF9mqRe1U4J3x17qnvhDzMX2pdlhSKKIMMwA1rmGRmGskq+g==';
+const ZEPTOMAIL_URL = process.env.ZEPTOMAIL_URL || 'https://api.zeptomail.com/v1.1/email';
+const ZEPTOMAIL_TOKEN = process.env.ZEPTOMAIL_TOKEN;
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@timey.app';
+
+if (!ZEPTOMAIL_TOKEN) {
+    throw new Error('ZEPTOMAIL_TOKEN environment variable is required');
+}
 
 const mailClient = new SendMailClient({
     url: ZEPTOMAIL_URL,
@@ -89,7 +92,7 @@ export const requestOtp = createServerFn({ method: 'POST' })
         try {
             await mailClient.sendMail({
                 from: {
-                    address: 'noreply@bootserp.com',
+                    address: SENDER_EMAIL,
                     name: 'Timey',
                 },
                 to: [
