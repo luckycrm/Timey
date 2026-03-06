@@ -1,4 +1,6 @@
 node_modules
+bun.lock
+spacetimedb/bun.lock
 docs/
 .DS_Store
 .env
