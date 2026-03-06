@@ -32,9 +32,9 @@ export const ChatMessage = __t.object("ChatMessage", {
   id: __t.u64(),
   channelId: __t.u64(),
   senderId: __t.u64(),
-  parentMessageId: __t.u64(),
   content: __t.string(),
   createdAt: __t.u64(),
+  parentMessageId: __t.u64(),
   editedAt: __t.u64(),
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;

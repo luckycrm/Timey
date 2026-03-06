@@ -46,6 +46,8 @@ import { ChatSidebar } from './ChatSidebar';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 
+const NONE_U64 = 18446744073709551615n;
+
 interface SidebarChannel {
     id: bigint;
     name: string;
@@ -331,7 +333,7 @@ export function ChatPage() {
     const repliesByParent = useMemo(() => {
         const map = new Map<string, DbChatMessage[]>();
         for (const msg of selectedChannelMessages) {
-            if (msg.parentMessageId === 0n) continue;
+            if (msg.parentMessageId === 0n || msg.parentMessageId === NONE_U64) continue;
             const key = String(msg.parentMessageId);
             const existing = map.get(key);
             if (existing) {
@@ -364,7 +366,7 @@ export function ChatPage() {
     }, [messageSearch, selectedChannelMessages, userById]);
 
     const mainChannelMessages = useMemo(
-        () => filteredChannelMessages.filter((msg) => msg.parentMessageId === 0n),
+        () => filteredChannelMessages.filter((msg) => msg.parentMessageId === 0n || msg.parentMessageId === NONE_U64),
         [filteredChannelMessages]
     );
 
@@ -626,20 +628,20 @@ export function ChatPage() {
         id: msg.id,
         channel_id: msg.channelId,
         sender_id: msg.senderId,
-        parent_message_id: msg.parentMessageId,
+        parent_message_id: msg.parentMessageId === NONE_U64 ? 0n : msg.parentMessageId,
         content: msg.content,
         created_at: msg.createdAt,
-        edited_at: msg.editedAt,
+        edited_at: msg.editedAt === NONE_U64 ? 0n : msg.editedAt,
     }));
 
     const threadMessageRows = threadReplies.map((msg) => ({
         id: msg.id,
         channel_id: msg.channelId,
         sender_id: msg.senderId,
-        parent_message_id: msg.parentMessageId,
+        parent_message_id: msg.parentMessageId === NONE_U64 ? 0n : msg.parentMessageId,
         content: msg.content,
         created_at: msg.createdAt,
-        edited_at: msg.editedAt,
+        edited_at: msg.editedAt === NONE_U64 ? 0n : msg.editedAt,
     }));
 
     const channelHeaderSubtitle = selectedChannel

@@ -1,5 +1,7 @@
 import { schema, table, t } from 'spacetimedb/server';
 
+const NONE_U64 = 18446744073709551615n;
+
 const spacetimedb = schema({
   user: table(
     { name: 'user', public: true },
@@ -80,10 +82,10 @@ const spacetimedb = schema({
       id: t.u64().primaryKey().autoInc(),
       channel_id: t.u64().index('btree'),
       sender_id: t.u64().index('btree'),
-      parent_message_id: t.u64().index('btree'),
       content: t.string(),
       created_at: t.u64(),
-      edited_at: t.u64(),
+      parent_message_id: t.u64().index('btree').default(NONE_U64),
+      edited_at: t.u64().default(NONE_U64),
     }
   ),
   chat_reaction: table(
@@ -498,10 +500,10 @@ export const sendMessage = spacetimedb.reducer(
       id: 0n,
       channel_id,
       sender_id: user.id,
-      parent_message_id,
+      parent_message_id: parent_message_id === 0n ? NONE_U64 : parent_message_id,
       content,
       created_at: now,
-      edited_at: 0n,
+      edited_at: NONE_U64,
     });
 
     upsertPresence(ctx, user.id, 0n, channel_id, 'online', now);
