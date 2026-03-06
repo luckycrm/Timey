@@ -233,11 +233,11 @@ export function LoginForm() {
 
                     <Typography variant="caption" sx={{ color: '#555555', textAlign: 'center', px: 2 }}>
                         By signing in, you understand and agree to our{' '}
-                        <Link href="#" underline="always" sx={{ color: 'inherit' }}>
+                        <Link href="/terms" underline="always" sx={{ color: 'inherit' }}>
                             Terms of Service
                         </Link>{' '}
                         and{' '}
-                        <Link href="#" underline="always" sx={{ color: 'inherit' }}>
+                        <Link href="/privacy" underline="always" sx={{ color: 'inherit' }}>
                             Privacy Policy
                         </Link>
                         .
