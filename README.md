@@ -6,6 +6,7 @@
 [![TanStack Start](https://img.shields.io/badge/TanStack-Start-FF4154.svg)](https://tanstack.com/start)
 [![SpacetimeDB](https://img.shields.io/badge/SpacetimeDB-Realtime-1f6feb.svg)](https://spacetimedb.com/)
 [![Bun](https://img.shields.io/badge/Runtime-Bun-black.svg)](https://bun.sh/)
+[![Contributors](https://img.shields.io/badge/Contributors-@luckycrm-ffb020.svg)](./CONTRIBUTORS.md)
 
 Timey is an open-source employee, project, and time management platform for modern teams.  
 It combines passwordless access, organization onboarding, member management, and real-time collaboration into one fast web app.
@@ -120,6 +121,11 @@ spacetimedb/
 - [ ] Time entries, attendance, and reporting
 - [ ] Role-based permissions and audit trails
 
+## Contributors
+
+- [@luckycrm](https://github.com/luckycrm)
+- Full list: [CONTRIBUTORS.md](./CONTRIBUTORS.md)
+
 ## Contributing
 
 Contributions are welcome.
@@ -134,10 +140,16 @@ Generated files like `src/module_bindings/` and `src/routeTree.gen.ts` should no
 Read:
 
 - [Contributing Guide](./CONTRIBUTING.md)
+- [Contributors](./CONTRIBUTORS.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 - [Security Policy](./SECURITY.md)
 - [Support](./SUPPORT.md)
 - [Governance](./GOVERNANCE.md)
+
+Automated review:
+
+- CodeRabbit checks are configured via [`.coderabbit.yaml`](./.coderabbit.yaml)
+- Install/enable the CodeRabbit GitHub App on this repository to activate PR checks
 
 ## Security Notes
 
