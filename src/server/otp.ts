@@ -42,17 +42,17 @@ function normalizeCode(code: string): string {
 
 // ─── ZeptoMail Client ────────────────────────────────────────────────
 const ZEPTOMAIL_URL = process.env.ZEPTOMAIL_URL || 'https://api.zeptomail.com/v1.1/email';
-const ZEPTOMAIL_TOKEN = process.env.ZEPTOMAIL_TOKEN;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@timey.app';
 
-if (!ZEPTOMAIL_TOKEN) {
-    throw new Error('ZEPTOMAIL_TOKEN environment variable is required');
-}
+function getMailClient(): SendMailClient | null {
+    const token = process.env.ZEPTOMAIL_TOKEN;
+    if (!token) return null;
 
-const mailClient = new SendMailClient({
-    url: ZEPTOMAIL_URL,
-    token: ZEPTOMAIL_TOKEN,
-});
+    return new SendMailClient({
+        url: ZEPTOMAIL_URL,
+        token,
+    });
+}
 
 // ─── Server Functions ────────────────────────────────────────────────
 
@@ -87,6 +87,21 @@ export const requestOtp = createServerFn({ method: 'POST' })
             attempts: 0,
             issuedAt: now,
         });
+
+        const mailClient = getMailClient();
+        if (!mailClient) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('ZEPTOMAIL_TOKEN is not configured; returning OTP in development logs.');
+                console.log(`[DEV] OTP for ${email}: ${code}`);
+                return { success: true, devCode: code };
+            }
+
+            otpStore.delete(email);
+            return {
+                success: false,
+                error: 'Email delivery is not configured. Please contact support.',
+            };
+        }
 
         // Send email via ZeptoMail
         try {

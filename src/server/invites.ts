@@ -2,17 +2,16 @@ import { createServerFn } from '@tanstack/react-start';
 import { SendMailClient } from 'zeptomail';
 
 const ZEPTOMAIL_URL = process.env.ZEPTOMAIL_URL || 'https://api.zeptomail.com/v1.1/email';
-const ZEPTOMAIL_TOKEN = process.env.ZEPTOMAIL_TOKEN;
 const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@timey.app';
 
-if (!ZEPTOMAIL_TOKEN) {
-  throw new Error('ZEPTOMAIL_TOKEN environment variable is required');
+function getMailClient(): SendMailClient | null {
+  const token = process.env.ZEPTOMAIL_TOKEN;
+  if (!token) return null;
+  return new SendMailClient({
+    url: ZEPTOMAIL_URL,
+    token,
+  });
 }
-
-const mailClient = new SendMailClient({
-  url: ZEPTOMAIL_URL,
-  token: ZEPTOMAIL_TOKEN,
-});
 
 /**
  * Send an invitation email to a new employee.
@@ -27,6 +26,15 @@ export const sendInviteEmail = createServerFn({ method: 'POST' })
 
     if (!email || !email.includes('@')) {
       return { success: false, error: 'Invalid email address' };
+    }
+
+    const mailClient = getMailClient();
+    if (!mailClient) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('ZEPTOMAIL_TOKEN is not configured; skipping invite email send in development.');
+        return { success: true, skippedEmail: true };
+      }
+      return { success: false, error: 'Email delivery is not configured. Please contact support.' };
     }
 
     try {

@@ -2,12 +2,8 @@ import { createHmac } from 'crypto';
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const COOKIE_NAME = 'timey_session';
-
-if (!SESSION_SECRET) {
-    throw new Error('SESSION_SECRET environment variable is required');
-}
-
-const secret: string = SESSION_SECRET;
+const DEV_FALLBACK_SECRET = 'timey-dev-session-secret';
+let hasWarnedMissingSecret = false;
 
 export interface SessionData {
     email: string;
@@ -16,6 +12,21 @@ export interface SessionData {
 }
 
 function sign(data: string): string {
+    const secret = SESSION_SECRET || (
+        process.env.NODE_ENV !== 'production'
+            ? DEV_FALLBACK_SECRET
+            : null
+    );
+
+    if (!secret) {
+        throw new Error('SESSION_SECRET environment variable is required');
+    }
+
+    if (!SESSION_SECRET && !hasWarnedMissingSecret) {
+        hasWarnedMissingSecret = true;
+        console.warn('SESSION_SECRET is not configured; using an insecure development fallback secret.');
+    }
+
     return createHmac('sha256', secret).update(data).digest('hex');
 }
 
