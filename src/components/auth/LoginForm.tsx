@@ -25,6 +25,10 @@ export function LoginForm() {
     const conn = useSpacetimeDB();
     const registerUser = useReducer(reducers.registerUser);
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const isRequestingOtpRef = useRef(false);
+    const isVerifyingOtpRef = useRef(false);
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     useEffect(() => {
         if (step === 'otp') {
@@ -45,12 +49,13 @@ export function LoginForm() {
 
     const handleRequestOtp = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email.trim() || loading) return;
+        if (!normalizedEmail || loading || isRequestingOtpRef.current) return;
 
+        isRequestingOtpRef.current = true;
         setLoading(true);
 
         try {
-            const result = await requestOtp({ data: { email: email.trim() } as any });
+            const result = await requestOtp({ data: { email: normalizedEmail } as any });
             if (result.success) {
                 toast.success('Access code sent. Check your inbox.');
                 setStep('otp');
@@ -60,6 +65,7 @@ export function LoginForm() {
         } catch {
             toast.error('Something went wrong. Please try again.');
         } finally {
+            isRequestingOtpRef.current = false;
             setLoading(false);
         }
     };
@@ -98,22 +104,23 @@ export function LoginForm() {
     };
 
     const handleVerifyOtp = async (code?: string) => {
-        const otpCode = code || otp.join('');
-        if (otpCode.length !== 6 || loading) return;
+        const otpCode = (code || otp.join('')).replace(/\D/g, '').slice(0, 6);
+        if (otpCode.length !== 6 || loading || isVerifyingOtpRef.current) return;
 
+        isVerifyingOtpRef.current = true;
         setLoading(true);
 
         try {
             const result = await verifyOtp({
-                data: { email: email.trim(), code: otpCode } as any,
+                data: { email: normalizedEmail, code: otpCode } as any,
             });
 
             if (result.success) {
                 if (conn.isActive) {
                     try {
                         await registerUser({
-                            email: email.trim(),
-                            name: email.split('@')[0],
+                            email: normalizedEmail,
+                            name: normalizedEmail.split('@')[0],
                         });
                     } catch {
                         // Best effort user registration.
@@ -129,17 +136,19 @@ export function LoginForm() {
         } catch {
             toast.error('Verification failed. Please try again.');
         } finally {
+            isVerifyingOtpRef.current = false;
             setLoading(false);
         }
     };
 
     const handleResend = async () => {
-        if (resendTimer > 0) return;
+        if (resendTimer > 0 || loading || isRequestingOtpRef.current) return;
         setOtp(['', '', '', '', '', '']);
+        isRequestingOtpRef.current = true;
         setLoading(true);
 
         try {
-            const result = await requestOtp({ data: { email: email.trim() } as any });
+            const result = await requestOtp({ data: { email: normalizedEmail } as any });
             if (result.success) {
                 toast.success('A fresh code is on the way.');
                 setResendTimer(60);
@@ -147,6 +156,7 @@ export function LoginForm() {
         } catch {
             toast.error('Failed to resend. Please try again.');
         } finally {
+            isRequestingOtpRef.current = false;
             setLoading(false);
         }
     };
@@ -249,6 +259,8 @@ function EmailStep({
     loading: boolean;
     onSubmit: (event: React.FormEvent) => void;
 }) {
+    const normalizedEmail = email.trim().toLowerCase();
+
     return (
         <form onSubmit={onSubmit}>
             <Stack spacing={2.5}>
@@ -275,15 +287,15 @@ function EmailStep({
                     type="submit"
                     variant="contained"
                     fullWidth
-                    disabled={!email.trim() || loading}
+                    disabled={!normalizedEmail || loading}
                     sx={{
-                        bgcolor: email.trim() ? '#ffffff' : '#333333',
-                        color: email.trim() ? '#000000' : '#666666',
+                        bgcolor: normalizedEmail ? '#ffffff' : '#333333',
+                        color: normalizedEmail ? '#000000' : '#666666',
                         textTransform: 'none',
                         py: 1.2,
                         fontWeight: 600,
                         '&:hover': {
-                            bgcolor: email.trim() ? '#e0e0e0' : '#444444'
+                            bgcolor: normalizedEmail ? '#e0e0e0' : '#444444'
                         },
                         '&.Mui-disabled': {
                             bgcolor: '#1a1a1a',
@@ -434,4 +446,3 @@ function OtpStep({
         </Stack>
     );
 }
-

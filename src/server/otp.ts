@@ -11,11 +11,13 @@ interface OtpEntry {
     code: string;
     expiresAt: number;
     attempts: number;
+    issuedAt: number;
 }
 
 const otpStore = new Map<string, OtpEntry>();
 const OTP_TTL = 5 * 60 * 1000; // 5 minutes
 const MAX_ATTEMPTS = 5;
+const OTP_REUSE_WINDOW = 60 * 1000; // 60 seconds
 
 function generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -28,6 +30,14 @@ function cleanExpiredOtps() {
             otpStore.delete(key);
         }
     }
+}
+
+function normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+}
+
+function normalizeCode(code: string): string {
+    return code.replace(/\D/g, '').slice(0, 6);
 }
 
 // ─── ZeptoMail Client ────────────────────────────────────────────────
@@ -48,7 +58,8 @@ const mailClient = new SendMailClient({
  */
 export const requestOtp = createServerFn({ method: 'POST' })
     .handler(async (ctx) => {
-        const { email } = (ctx.data as any) as { email: string };
+        const { email: rawEmail } = (ctx.data as any) as { email: string };
+        const email = normalizeEmail(rawEmail ?? '');
 
         if (!email || !email.includes('@')) {
             return { success: false, error: 'Invalid email address' };
@@ -57,12 +68,21 @@ export const requestOtp = createServerFn({ method: 'POST' })
         // Clean expired OTPs
         cleanExpiredOtps();
 
-        // Generate OTP
-        const code = generateOtp();
-        otpStore.set(email.toLowerCase(), {
+        const now = Date.now();
+        const existingEntry = otpStore.get(email);
+        const shouldReuseCode =
+            !!existingEntry &&
+            existingEntry.expiresAt >= now &&
+            now - existingEntry.issuedAt <= OTP_REUSE_WINDOW;
+
+        // Reuse the same code for rapid repeated requests to avoid invalidating
+        // the first email when users double-submit.
+        const code = shouldReuseCode ? existingEntry.code : generateOtp();
+        otpStore.set(email, {
             code,
-            expiresAt: Date.now() + OTP_TTL,
+            expiresAt: now + OTP_TTL,
             attempts: 0,
+            issuedAt: now,
         });
 
         // Send email via ZeptoMail
@@ -97,9 +117,13 @@ export const requestOtp = createServerFn({ method: 'POST' })
             return { success: true };
         } catch (error) {
             console.error('Failed to send OTP email:', error);
-            // In development, still return success and log the code
-            console.log(`[DEV] OTP for ${email}: ${code}`);
-            return { success: true, devCode: process.env.NODE_ENV === 'development' ? code : undefined };
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[DEV] OTP for ${email}: ${code}`);
+                return { success: true, devCode: code };
+            }
+
+            otpStore.delete(email);
+            return { success: false, error: 'Failed to send access code. Please try again.' };
         }
     });
 
@@ -109,7 +133,8 @@ export const requestOtp = createServerFn({ method: 'POST' })
 export const verifyOtp = createServerFn({ method: 'POST' })
     .handler(async (ctx) => {
         const { email, code } = (ctx.data as any) as { email: string; code: string };
-        const normalizedEmail = email.toLowerCase();
+        const normalizedEmail = normalizeEmail(email ?? '');
+        const normalizedCode = normalizeCode(code ?? '');
 
         const entry = otpStore.get(normalizedEmail);
 
@@ -127,9 +152,16 @@ export const verifyOtp = createServerFn({ method: 'POST' })
             return { success: false, error: 'Too many attempts. Please request a new code.' };
         }
 
-        entry.attempts++;
+        if (normalizedCode.length !== 6) {
+            return { success: false, error: 'Invalid code format.' };
+        }
 
-        if (entry.code !== code) {
+        if (entry.code !== normalizedCode) {
+            entry.attempts++;
+            if (entry.attempts >= MAX_ATTEMPTS) {
+                otpStore.delete(normalizedEmail);
+                return { success: false, error: 'Too many attempts. Please request a new code.' };
+            }
             return { success: false, error: `Invalid code. ${MAX_ATTEMPTS - entry.attempts} attempts remaining.` };
         }
 
