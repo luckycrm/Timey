@@ -12,7 +12,9 @@ import GroupAddRoundedIcon from '@mui/icons-material/GroupAddRounded';
 import SearchIcon from '@mui/icons-material/Search';
 import TagRoundedIcon from '@mui/icons-material/TagRounded';
 import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded';
+import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
 import { chatColors } from '../../theme/chatColors';
+import { appRadii } from '../../theme/radii';
 
 interface ChatChannel {
     id: bigint;
@@ -37,6 +39,15 @@ interface ChatMessage {
     created_at: bigint;
 }
 
+interface ChatScheduledMeeting {
+    id: bigint;
+    channel_id: bigint;
+    title: string;
+    scheduled_at: bigint;
+    status: string;
+    visibility?: string;
+}
+
 interface ChatSidebarProps {
     channels: ChatChannel[];
     selectedChannelId: bigint | null;
@@ -47,6 +58,11 @@ interface ChatSidebarProps {
     messages: ChatMessage[];
     unreadCountsByChannel?: Record<string, number>;
     peerByChannel?: Record<string, bigint | null>;
+    activeCallByChannel?: Record<string, { title: string; participantCount: number }>;
+    scheduledMeetings?: ChatScheduledMeeting[];
+    joiningMeetingId?: bigint | null;
+    onJoinMeeting?: (meetingId: bigint) => void;
+    onOpenMeetingManager?: () => void;
 }
 
 function formatRelativeTime(timestamp: bigint): string {
@@ -78,6 +94,11 @@ export function ChatSidebar({
     messages,
     unreadCountsByChannel = {},
     peerByChannel = {},
+    activeCallByChannel = {},
+    scheduledMeetings = [],
+    joiningMeetingId = null,
+    onJoinMeeting,
+    onOpenMeetingManager,
 }: ChatSidebarProps) {
     const [search, setSearch] = useState('');
 
@@ -113,6 +134,34 @@ export function ChatSidebar({
 
     const dmChannels = filteredChannels.filter((ch) => ch.type === 'dm');
     const groupChannels = filteredChannels.filter((ch) => ch.type !== 'dm');
+    const upcomingMeetings = useMemo(() => {
+        const rows = scheduledMeetings
+            .filter((meeting) => meeting.status === 'scheduled' || meeting.status === 'started')
+            .sort((a, b) => Number(a.scheduled_at) - Number(b.scheduled_at));
+        return rows.slice(0, 5);
+    }, [scheduledMeetings]);
+
+    const channelNameById = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const channel of channels) {
+            map.set(String(channel.id), channel.name);
+        }
+        return map;
+    }, [channels]);
+
+    const formatMeetingTime = (timestamp: bigint) =>
+        new Date(Number(timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const getJoinAvailability = (meeting: ChatScheduledMeeting): { disabled: boolean; label: string } => {
+        if (meeting.status === 'started') return { disabled: false, label: 'Join' };
+        const joinOpenAt = Number(meeting.scheduled_at) - 10 * 60_000;
+        const now = Date.now();
+        if (now < joinOpenAt) {
+            const mins = Math.max(1, Math.ceil((joinOpenAt - now) / 60_000));
+            return { disabled: true, label: `${mins}m` };
+        }
+        return { disabled: false, label: 'Join' };
+    };
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -129,7 +178,7 @@ export function ChatSidebar({
                         textTransform: 'none',
                         fontWeight: 600,
                         fontSize: '0.76rem',
-                        borderRadius: 1.5,
+                        borderRadius: appRadii.control,
                         height: 34,
                         whiteSpace: 'nowrap',
                         '&:hover': { bgcolor: chatColors.actionBgHover },
@@ -149,7 +198,7 @@ export function ChatSidebar({
                         textTransform: 'none',
                         fontWeight: 600,
                         fontSize: '0.76rem',
-                        borderRadius: 1.5,
+                        borderRadius: appRadii.control,
                         height: 34,
                         whiteSpace: 'nowrap',
                         '&:hover': { borderColor: chatColors.borderStrong, color: chatColors.textPrimary, bgcolor: chatColors.hover },
@@ -163,7 +212,7 @@ export function ChatSidebar({
             <Box
                 sx={{
                     bgcolor: chatColors.inputBg,
-                    borderRadius: 1.5,
+                    borderRadius: appRadii.control,
                     px: 1.5,
                     py: 0.6,
                     display: 'flex',
@@ -185,6 +234,127 @@ export function ChatSidebar({
             </Box>
 
             <Divider sx={{ borderColor: chatColors.border, mb: 1 }} />
+
+            {upcomingMeetings.length > 0 && (
+                <Box
+                    sx={{
+                        mb: 1.2,
+                        p: 1,
+                        borderRadius: appRadii.panel,
+                        border: `1px solid ${chatColors.border}`,
+                        bgcolor: chatColors.hoverSoft,
+                    }}
+                >
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.8 }}>
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                color: chatColors.textMuted,
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.07em',
+                                fontSize: '0.62rem',
+                            }}
+                        >
+                            Upcoming Meetings
+                        </Typography>
+                        {onOpenMeetingManager && (
+                            <Button
+                                size="small"
+                                onClick={onOpenMeetingManager}
+                                sx={{
+                                    minWidth: 0,
+                                    px: 0.75,
+                                    py: 0.2,
+                                    textTransform: 'none',
+                                    color: chatColors.textMuted,
+                                    fontSize: '0.66rem',
+                                    fontWeight: 600,
+                                    '&:hover': { color: chatColors.textPrimary, bgcolor: 'rgba(255,255,255,0.04)' },
+                                }}
+                            >
+                                Manage
+                            </Button>
+                        )}
+                    </Stack>
+                    <Stack spacing={0.65}>
+                        {upcomingMeetings.map((meeting) => {
+                            const availability = getJoinAvailability(meeting);
+                            const loading = joiningMeetingId === meeting.id;
+                            return (
+                                <Box
+                                    key={String(meeting.id)}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 1,
+                                        borderRadius: 1.2,
+                                        px: 0.95,
+                                        py: 0.65,
+                                        bgcolor: 'rgba(255,255,255,0.02)',
+                                    }}
+                                >
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                            sx={{
+                                                color: chatColors.textPrimary,
+                                                fontSize: '0.72rem',
+                                                fontWeight: 700,
+                                                lineHeight: 1.2,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {meeting.title}
+                                        </Typography>
+                                        <Typography
+                                            sx={{
+                                                color: chatColors.textMuted,
+                                                fontSize: '0.64rem',
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {meeting.visibility === 'public'
+                                                ? `Public meeting • ${formatMeetingTime(meeting.scheduled_at)}`
+                                                : `#${channelNameById.get(String(meeting.channel_id)) || 'channel'} • ${formatMeetingTime(meeting.scheduled_at)}`}
+                                        </Typography>
+                                    </Box>
+                                    <Button
+                                        size="small"
+                                        startIcon={<VideocamRoundedIcon sx={{ fontSize: 12 }} />}
+                                        onClick={() => onJoinMeeting?.(meeting.id)}
+                                        disabled={loading || availability.disabled || !onJoinMeeting}
+                                        sx={{
+                                            minWidth: 0,
+                                            px: 0.85,
+                                            py: 0.3,
+                                            borderRadius: 1,
+                                            textTransform: 'none',
+                                            fontSize: '0.66rem',
+                                            fontWeight: 700,
+                                            color: chatColors.textPrimary,
+                                            border: '1px solid rgba(56,200,114,0.32)',
+                                            bgcolor: availability.disabled
+                                                ? 'rgba(255,255,255,0.03)'
+                                                : 'rgba(56,200,114,0.13)',
+                                            '&:hover': {
+                                                bgcolor: availability.disabled
+                                                    ? 'rgba(255,255,255,0.05)'
+                                                    : 'rgba(56,200,114,0.22)',
+                                            },
+                                            '& .MuiButton-startIcon': { mr: 0.4 },
+                                        }}
+                                    >
+                                        {loading ? 'Joining' : availability.label}
+                                    </Button>
+                                </Box>
+                            );
+                        })}
+                    </Stack>
+                </Box>
+            )}
 
             {/* Channel List */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', mx: -0.5 }}>
@@ -217,6 +387,7 @@ export function ChatSidebar({
                                     const isSelected = selectedChannelId === channel.id;
                                     const lastMsg = getLastMessage.get(String(channel.id));
                                     const unreadCount = unreadCountsByChannel[String(channel.id)] || 0;
+                                    const activeCall = activeCallByChannel[String(channel.id)] || null;
                                     const peer = getUserById(peerByChannel[String(channel.id)]);
                                     const peerOnline = isLikelyOnline(peer);
 
@@ -230,7 +401,7 @@ export function ChatSidebar({
                                                 gap: 1.25,
                                                 px: 1.5,
                                                 py: 0.9,
-                                                borderRadius: 1.5,
+                                                borderRadius: appRadii.card,
                                                 cursor: 'pointer',
                                                 bgcolor: isSelected ? chatColors.selection : 'transparent',
                                                 '&:hover': {
@@ -282,6 +453,20 @@ export function ChatSidebar({
                                                     >
                                                         {(peer?.name || channel.name)}
                                                     </Typography>
+                                                    {activeCall && (
+                                                        <Chip
+                                                            label={`Live ${activeCall.participantCount}`}
+                                                            size="small"
+                                                            sx={{
+                                                                height: 16,
+                                                                fontSize: '0.58rem',
+                                                                bgcolor: 'rgba(80, 210, 130, 0.15)',
+                                                                color: '#85f0ad',
+                                                                fontWeight: 700,
+                                                                '& .MuiChip-label': { px: 0.55 },
+                                                            }}
+                                                        />
+                                                    )}
                                                     {lastMsg && (
                                                         <Typography variant="caption" sx={{ color: chatColors.textMuted, fontSize: '0.65rem' }}>
                                                             {formatRelativeTime(lastMsg.created_at)}
@@ -346,6 +531,7 @@ export function ChatSidebar({
                                     const isSelected = selectedChannelId === channel.id;
                                     const lastMsg = getLastMessage.get(String(channel.id));
                                     const unreadCount = unreadCountsByChannel[String(channel.id)] || 0;
+                                    const activeCall = activeCallByChannel[String(channel.id)] || null;
 
                                     return (
                                         <Box
@@ -357,7 +543,7 @@ export function ChatSidebar({
                                                 gap: 1,
                                                 px: 1.5,
                                                 py: 0.75,
-                                                borderRadius: 1.5,
+                                                borderRadius: appRadii.card,
                                                 cursor: 'pointer',
                                                 bgcolor: isSelected ? chatColors.selection : 'transparent',
                                                 '&:hover': {
@@ -382,6 +568,20 @@ export function ChatSidebar({
                                                     >
                                                         {channel.name}
                                                     </Typography>
+                                                    {activeCall && (
+                                                        <Chip
+                                                            label={`Live ${activeCall.participantCount}`}
+                                                            size="small"
+                                                            sx={{
+                                                                height: 16,
+                                                                fontSize: '0.58rem',
+                                                                bgcolor: 'rgba(80, 210, 130, 0.15)',
+                                                                color: '#85f0ad',
+                                                                fontWeight: 700,
+                                                                '& .MuiChip-label': { px: 0.55 },
+                                                            }}
+                                                        />
+                                                    )}
                                                     <Stack direction="row" spacing={0.6} alignItems="center">
                                                         {lastMsg && (
                                                             <Typography variant="caption" sx={{ color: chatColors.textMuted, fontSize: '0.65rem' }}>

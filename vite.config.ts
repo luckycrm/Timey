@@ -7,6 +7,9 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  ssr: {
+    noExternal: ['@dytesdk/react-ui-kit', '@dytesdk/ui-kit'],
+  },
   plugins: [
     tsConfigPaths({
       projects: ['./tsconfig.json'],

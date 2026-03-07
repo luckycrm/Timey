@@ -16,7 +16,10 @@ import AddReactionRoundedIcon from '@mui/icons-material/AddReactionRounded';
 import SubdirectoryArrowRightRoundedIcon from '@mui/icons-material/SubdirectoryArrowRightRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
+import CallEndRoundedIcon from '@mui/icons-material/CallEndRounded';
 import { chatColors } from '../../theme/chatColors';
+import { appRadii } from '../../theme/radii';
 
 interface Message {
     id: bigint;
@@ -32,6 +35,18 @@ interface ReactionSummary {
     emoji: string;
     count: number;
     reactedByMe: boolean;
+}
+
+interface CallEventMessage {
+    kind: 'started' | 'ended';
+    title: string;
+}
+
+interface CallWindow {
+    title: string;
+    startAt: bigint;
+    endAt?: bigint;
+    endMessageId?: bigint;
 }
 
 interface MessageListProps {
@@ -51,6 +66,27 @@ interface MessageListProps {
 
 const QUICK_REACTIONS = ['👍', '🔥', '😂', '🎉', '✅', '👀'];
 
+function parseCallEventMessage(content: string): CallEventMessage | null {
+    const trimmed = content.trim();
+    const started = trimmed.match(/^started a video call:\s*(.+)$/i);
+    if (started) {
+        return {
+            kind: 'started',
+            title: started[1]?.trim() || 'Team call',
+        };
+    }
+
+    const ended = trimmed.match(/^ended the video call:\s*(.+)$/i);
+    if (ended) {
+        return {
+            kind: 'ended',
+            title: ended[1]?.trim() || 'Team call',
+        };
+    }
+
+    return null;
+}
+
 function formatTime(timestamp: bigint): string {
     const date = new Date(Number(timestamp));
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -65,6 +101,22 @@ function formatDateHeader(timestamp: bigint): string {
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function formatCallDuration(startAt: bigint, endAt: bigint): string {
+    const diffMs = Math.max(0, Number(endAt) - Number(startAt));
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
 }
 
 export function MessageList({
@@ -101,6 +153,38 @@ export function MessageList({
     }, [isNearBottom, messages.length]);
 
     const sortedMessages = [...messages].sort((a, b) => Number(a.created_at) - Number(b.created_at));
+
+    const callWindowByStartMessageId = new Map<string, CallWindow>();
+    const hiddenCallEventMessageIds = new Set<string>();
+    const pendingCallStartsByTitle = new Map<string, Message[]>();
+
+    for (const msg of sortedMessages) {
+        const event = parseCallEventMessage(msg.content);
+        if (!event) continue;
+
+        if (event.kind === 'started') {
+            const queue = pendingCallStartsByTitle.get(event.title) || [];
+            queue.push(msg);
+            pendingCallStartsByTitle.set(event.title, queue);
+            callWindowByStartMessageId.set(String(msg.id), {
+                title: event.title,
+                startAt: msg.created_at,
+            });
+            continue;
+        }
+
+        const queue = pendingCallStartsByTitle.get(event.title);
+        if (queue && queue.length > 0) {
+            const startMessage = queue.shift()!;
+            callWindowByStartMessageId.set(String(startMessage.id), {
+                title: event.title,
+                startAt: startMessage.created_at,
+                endAt: msg.created_at,
+                endMessageId: msg.id,
+            });
+            hiddenCallEventMessageIds.add(String(msg.id));
+        }
+    }
 
     const getSender = (senderId: bigint) => {
         return users.find((u) => u.id === senderId);
@@ -152,13 +236,13 @@ export function MessageList({
                             ...(isMention && {
                                 color: chatColors.textPrimary,
                                 bgcolor: isOwnMention ? chatColors.searchHit : chatColors.mention,
-                                borderRadius: 0.8,
+                                borderRadius: appRadii.badge,
                                 px: 0.35,
                                 fontWeight: 600,
                             }),
                             ...(hasSearchHit && {
                                 bgcolor: chatColors.searchHit,
-                                borderRadius: 0.7,
+                                borderRadius: appRadii.badge,
                             }),
                         }}
                     >
@@ -224,7 +308,7 @@ export function MessageList({
                         textOverflow: 'ellipsis',
                     }}
                 >
-                    {normalizedSearch ? 'No messages match your search.' : 'No messages yet. Start the conversation!'}
+                    {normalizedSearch ? 'No messages match your search.' : 'No messages yet. Start a conversation.'}
                 </Typography>
             </Box>
         );
@@ -283,6 +367,10 @@ export function MessageList({
                     )}
 
                     {group.messages.map((msg, i) => {
+                        if (hiddenCallEventMessageIds.has(String(msg.id))) {
+                            return null;
+                        }
+
                         const sender = getSender(msg.sender_id);
                         const isOwn = currentUserId !== null && msg.sender_id === currentUserId;
                         const prevMsg = i > 0 ? group.messages[i - 1] : null;
@@ -291,6 +379,13 @@ export function MessageList({
                         const reactions = reactionsByMessage[String(msg.id)] || [];
                         const replyCount = replyCountByMessage[String(msg.id)] || 0;
                         const isEditing = editingMessageId === msg.id;
+                        const callEvent = parseCallEventMessage(msg.content);
+                        const isCallEventMessage = callEvent !== null;
+                        const callWindow = callWindowByStartMessageId.get(String(msg.id)) || null;
+                        const isCallStartMessage = callEvent?.kind === 'started';
+                        const hasEnded = isCallStartMessage && Boolean(callWindow?.endAt);
+                        const callDisplayKind: 'started' | 'ended' =
+                            hasEnded ? 'ended' : (callEvent?.kind || 'started');
 
                         const colors = ['#1a1a1a', '#222222', '#2a2a2a', '#333333', '#444444', '#555555'];
                         const colorIndex = sender
@@ -306,7 +401,7 @@ export function MessageList({
                                     gap: 1.15,
                                     py: showAvatar ? 0.68 : 0.28,
                                     px: threadMode ? 0.7 : 1,
-                                    borderRadius: 1.25,
+                                    borderRadius: appRadii.card,
                                     '&:hover': { bgcolor: chatColors.hoverSoft },
                                 }}
                             >
@@ -378,7 +473,7 @@ export function MessageList({
                                                 sx={{
                                                     flexGrow: 1,
                                                     border: `1px solid ${chatColors.borderStrong}`,
-                                                    borderRadius: 1.5,
+                                                    borderRadius: appRadii.control,
                                                     px: 1,
                                                     py: 0.5,
                                                     bgcolor: chatColors.inputBg,
@@ -413,6 +508,133 @@ export function MessageList({
                                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                                             </IconButton>
                                         </Stack>
+                                    ) : isCallEventMessage && callEvent ? (
+                                        <Box
+                                            sx={{
+                                                mt: 0.2,
+                                                borderRadius: appRadii.card,
+                                                px: 1,
+                                                py: 0.9,
+                                                pl: 1.25,
+                                                width: 'fit-content',
+                                                maxWidth: { xs: '100%', sm: 360 },
+                                                border: `1px solid ${chatColors.borderStrong}`,
+                                                bgcolor: 'rgba(8,8,8,0.78)',
+                                                backdropFilter: 'blur(10px)',
+                                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+                                                position: 'relative',
+                                                overflow: 'hidden',
+                                                '&::before': {
+                                                    content: '""',
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    width: 2.5,
+                                                    bgcolor: callDisplayKind === 'started' ? chatColors.success : chatColors.textMuted,
+                                                },
+                                            }}
+                                        >
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <Box
+                                                    sx={{
+                                                        width: 26,
+                                                        height: 26,
+                                                        borderRadius: 1,
+                                                        bgcolor:
+                                                            callDisplayKind === 'started'
+                                                                ? 'rgba(56,200,114,0.16)'
+                                                                : 'rgba(255,255,255,0.1)',
+                                                        border:
+                                                            callDisplayKind === 'started'
+                                                                ? '1px solid rgba(56,200,114,0.28)'
+                                                                : `1px solid ${chatColors.borderHover}`,
+                                                        color:
+                                                            callDisplayKind === 'started'
+                                                                ? '#8bf5b4'
+                                                                : '#c2c8d8',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    {callDisplayKind === 'started' ? (
+                                                        <VideocamRoundedIcon sx={{ fontSize: 15 }} />
+                                                    ) : (
+                                                        <CallEndRoundedIcon sx={{ fontSize: 15 }} />
+                                                    )}
+                                                </Box>
+
+                                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            color: chatColors.textPrimary,
+                                                            fontWeight: 700,
+                                                            fontSize: '0.76rem',
+                                                            lineHeight: 1.35,
+                                                        }}
+                                                    >
+                                                        Video meeting
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            color: '#d0d0d0',
+                                                            fontSize: '0.7rem',
+                                                            fontWeight: 500,
+                                                            lineHeight: 1.35,
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap',
+                                                        }}
+                                                    >
+                                                        {callWindow?.title || callEvent.title}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Chip
+                                                    size="small"
+                                                    label={callDisplayKind === 'started' ? 'Live' : 'Done'}
+                                                    sx={{
+                                                        height: 17,
+                                                        flexShrink: 0,
+                                                        bgcolor:
+                                                            callDisplayKind === 'started'
+                                                                ? 'rgba(56,200,114,0.16)'
+                                                                : 'rgba(255,255,255,0.08)',
+                                                        color:
+                                                            callDisplayKind === 'started'
+                                                                ? '#a0ffbf'
+                                                                : '#bcc3d3',
+                                                        fontWeight: 700,
+                                                        border: `1px solid ${chatColors.border}`,
+                                                        '& .MuiChip-label': {
+                                                            px: 0.6,
+                                                            fontSize: '0.58rem',
+                                                        },
+                                                    }}
+                                                />
+                                            </Stack>
+
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    display: 'block',
+                                                    mt: 0.5,
+                                                    color: chatColors.textSecondary,
+                                                    fontSize: '0.63rem',
+                                                    letterSpacing: '0.01em',
+                                                }}
+                                            >
+                                                {hasEnded && callWindow?.endAt
+                                                    ? `Duration ${formatCallDuration(callWindow.startAt, callWindow.endAt)} • ${formatTime(callWindow.startAt)} to ${formatTime(callWindow.endAt)}`
+                                                    : callEvent.kind === 'started'
+                                                        ? 'Meeting is live • Use the call control in the header to join.'
+                                                        : 'Meeting ended for all participants.'}
+                                            </Typography>
+                                        </Box>
                                     ) : (
                                         <Typography
                                             variant="body2"
@@ -473,17 +695,25 @@ export function MessageList({
                                                 sx={{
                                                     textTransform: 'none',
                                                     minWidth: 0,
-                                                    color: '#9ec0ff',
-                                                    fontSize: '0.71rem',
+                                                    color: '#d8e6ff',
+                                                    fontSize: '0.69rem',
                                                     fontWeight: 700,
-                                                    px: 0.95,
-                                                    py: 0.2,
-                                                    borderRadius: 1,
-                                                    bgcolor: 'rgba(116,167,255,0.14)',
-                                                    border: '1px solid rgba(116,167,255,0.35)',
+                                                    px: 1.05,
+                                                    py: 0.28,
+                                                    borderRadius: 1.25,
+                                                    lineHeight: 1,
+                                                    letterSpacing: '0.01em',
+                                                    bgcolor: 'rgba(255,255,255,0.04)',
+                                                    border: `1px solid ${chatColors.borderStrong}`,
+                                                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+                                                    '& .MuiButton-startIcon': {
+                                                        mr: 0.45,
+                                                        ml: -0.1,
+                                                    },
                                                     '&:hover': {
-                                                        bgcolor: 'rgba(116,167,255,0.24)',
-                                                        borderColor: 'rgba(116,167,255,0.5)',
+                                                        bgcolor: 'rgba(158,192,255,0.14)',
+                                                        borderColor: 'rgba(158,192,255,0.45)',
+                                                        color: '#f3f8ff',
                                                     },
                                                 }}
                                             >
@@ -492,7 +722,7 @@ export function MessageList({
                                                     : 'Reply'}
                                             </Button>
                                         )}
-                                        {isOwn && onEditMessage && !isEditing && (
+                                        {isOwn && onEditMessage && !isEditing && !isCallEventMessage && (
                                             <Button
                                                 size="small"
                                                 onClick={() => startEditing(msg)}
@@ -562,13 +792,13 @@ export function MessageList({
                         bgcolor: chatColors.actionBg,
                         color: chatColors.actionText,
                         textTransform: 'none',
-                        borderRadius: 4,
+                        borderRadius: appRadii.full,
                         px: 1.5,
                         minHeight: 30,
                         '&:hover': { bgcolor: chatColors.actionBgHover },
                     }}
                 >
-                    Jump to present
+                    Latest messages
                 </Button>
             )}
             <Menu

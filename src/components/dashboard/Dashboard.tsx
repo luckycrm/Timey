@@ -24,6 +24,7 @@ import { useOrganizationMembership } from '../../hooks/useOrganizationMembership
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { tables, reducers } from '../../module_bindings';
 import { sendInviteEmail } from '../../server/invites';
+import { appRadii } from '../../theme/radii';
 
 
 function EmptyTeamCard({
@@ -43,7 +44,7 @@ function EmptyTeamCard({
                 p: { xs: 4, md: 6 },
                 bgcolor: '#000000',
                 border: '1px solid #1a1a1a',
-                borderRadius: 4,
+                borderRadius: appRadii.panel,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -68,7 +69,7 @@ function EmptyTeamCard({
                 sx={{
                     width: 64,
                     height: 64,
-                    borderRadius: '20px',
+                    borderRadius: appRadii.card,
                     bgcolor: 'rgba(255, 255, 255, 0.03)',
                     display: 'flex',
                     alignItems: 'center',
@@ -128,7 +129,7 @@ function TeamWidget({
                 p: 2.5,
                 bgcolor: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid #1a1a1a',
-                borderRadius: 2,
+                borderRadius: appRadii.panel,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2.5,
@@ -234,7 +235,7 @@ function TeamWidget({
                     sx={{
                         minWidth: 0,
                         p: 1,
-                        borderRadius: 1.5,
+                        borderRadius: appRadii.control,
                         color: '#444',
                         bgcolor: 'rgba(255, 255, 255, 0.02)',
                         border: '1px solid #1a1a1a',
@@ -354,7 +355,7 @@ export function InviteSection({
                     color: '#000000',
                     height: 38,
                     px: 2.5,
-                    borderRadius: 1.5,
+                    borderRadius: appRadii.control,
                     textTransform: 'none',
                     fontWeight: 600,
                     width: '100%',
@@ -387,7 +388,7 @@ export function InviteSection({
                                     color: '#000000',
                                     height: 38,
                                     px: 1,
-                                    borderRadius: 1.5,
+                                    borderRadius: appRadii.badge,
                                     fontSize: '0.85rem',
                                     fontFamily: 'monospace',
                                     fontWeight: 700,

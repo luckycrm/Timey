@@ -24,18 +24,23 @@ import TagRoundedIcon from '@mui/icons-material/TagRounded';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
 import { useSpacetimeDBQuery, useReducer } from 'spacetimedb/tanstack';
 import { tables, reducers } from '../../module_bindings';
+import { appRadii } from '../../theme/radii';
 import type {
+    ChatCallParticipant as DbChatCallParticipant,
+    ChatCallSession as DbChatCallSession,
     ChatChannel as DbChatChannel,
     ChatChannelMember as DbChatChannelMember,
     ChatMessage as DbChatMessage,
     ChatReaction as DbChatReaction,
     ChatReadState as DbChatReadState,
+    ChatScheduledMeeting as DbChatScheduledMeeting,
     ChatTyping as DbChatTyping,
     OrganizationMember as DbOrganizationMember,
     User as DbUser,
@@ -47,7 +52,15 @@ import { DashboardLayout } from '../layout/DashboardLayout';
 import { ChatSidebar } from './ChatSidebar';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { DyteCallInline } from '../calls/DyteCallInline';
 import { chatColors } from '../../theme/chatColors';
+import {
+    clearActiveCallSnapshot,
+    getActiveCallSnapshot,
+    patchActiveCallSnapshot,
+    setActiveCallSnapshot,
+} from '../../lib/activeCall';
+import { createDyteMeetingAccess, joinDyteMeetingAccess } from '../../server/dyte';
 
 const NONE_U64 = 18446744073709551615n;
 
@@ -95,6 +108,15 @@ function formatMessageTime(timestamp: bigint): string {
     return new Date(Number(timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function parseBigIntOrNull(value: string | null): bigint | null {
+    if (!value) return null;
+    try {
+        return BigInt(value);
+    } catch {
+        return null;
+    }
+}
+
 export function ChatPage() {
     const { isAuthenticated, isLoading, logout } = useAuth();
     const { memberships, hasOrganization, isCheckingMembership } = useOrganizationMembership({
@@ -112,6 +134,9 @@ export function ChatPage() {
     const [allReadStates] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_read_state : 'skip');
     const [allTypingRows] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_typing : 'skip');
     const [allPresenceRows] = useSpacetimeDBQuery(isAuthenticated ? tables.user_presence : 'skip');
+    const [allCallSessions] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_call_session : 'skip');
+    const [allCallParticipants] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_call_participant : 'skip');
+    const [allScheduledMeetings] = useSpacetimeDBQuery(isAuthenticated ? tables.chat_scheduled_meeting : 'skip');
 
     const createChannel = useReducer(reducers.createChannel);
     const sendMessageReducer = useReducer(reducers.sendMessage);
@@ -121,6 +146,11 @@ export function ChatPage() {
     const markChannelReadReducer = useReducer(reducers.markChannelRead);
     const toggleReactionReducer = useReducer(reducers.toggleReaction);
     const editMessageReducer = useReducer(reducers.editMessage);
+    const startChannelCallReducer = useReducer(reducers.startChannelCall);
+    const joinChannelCallReducer = useReducer(reducers.joinChannelCall);
+    const leaveChannelCallReducer = useReducer(reducers.leaveChannelCall);
+    const endChannelCallReducer = useReducer(reducers.endChannelCall);
+    const joinScheduledMeetingReducer = useReducer(reducers.joinScheduledMeeting);
 
     const [selectedChannelId, setSelectedChannelId] = useState<bigint | null>(null);
     const [newChatOpen, setNewChatOpen] = useState(false);
@@ -135,6 +165,17 @@ export function ChatPage() {
     const [activeThreadParentId, setActiveThreadParentId] = useState<bigint | null>(null);
     const [composerTyping, setComposerTyping] = useState(false);
     const [threadComposerFocusSignal, setThreadComposerFocusSignal] = useState(0);
+    const [dyteCallOpen, setDyteCallOpen] = useState(false);
+    const [dyteCallLoading, setDyteCallLoading] = useState(false);
+    const [dyteAuthToken, setDyteAuthToken] = useState<string | null>(null);
+    const [dyteCallTitle, setDyteCallTitle] = useState('');
+    const [dyteCallSessionId, setDyteCallSessionId] = useState<bigint | null>(null);
+    const [dyteCallChannelId, setDyteCallChannelId] = useState<bigint | null>(null);
+    const [dyteCallMeetingId, setDyteCallMeetingId] = useState<string | null>(null);
+    const [pendingLeaveMeetingId, setPendingLeaveMeetingId] = useState<string | null>(null);
+    const [confirmEndCallOpen, setConfirmEndCallOpen] = useState(false);
+    const [endingCall, setEndingCall] = useState(false);
+    const [joiningScheduledMeetingId, setJoiningScheduledMeetingId] = useState<bigint | null>(null);
 
     const lastMarkedReadRef = useRef<string>('');
     const typingSyncRef = useRef<string>('');
@@ -152,6 +193,9 @@ export function ChatPage() {
     const readStates = (allReadStates || []) as DbChatReadState[];
     const typingRows = (allTypingRows || []) as DbChatTyping[];
     const presenceRows = (allPresenceRows || []) as DbUserPresence[];
+    const callSessions = (allCallSessions || []) as DbChatCallSession[];
+    const callParticipants = (allCallParticipants || []) as DbChatCallParticipant[];
+    const scheduledMeetings = (allScheduledMeetings || []) as DbChatScheduledMeeting[];
 
     const currentUser = useMemo(() => {
         if (!currentMembership) return null;
@@ -240,10 +284,73 @@ export function ChatPage() {
         }
     }, [myChannels, selectedChannelId]);
 
+    useEffect(() => {
+        const persisted = getActiveCallSnapshot();
+        if (!persisted.open || !persisted.authToken) return;
+
+        const persistedChannelId = parseBigIntOrNull(persisted.channelId);
+        const persistedSessionId = parseBigIntOrNull(persisted.callSessionId);
+        if (persistedChannelId != null) {
+            setSelectedChannelId(persistedChannelId);
+        }
+        setDyteAuthToken(persisted.authToken);
+        setDyteCallTitle(persisted.title || 'Video Meeting');
+        setDyteCallChannelId(persistedChannelId);
+        setDyteCallSessionId(persistedSessionId);
+        setDyteCallMeetingId(persisted.meetingId || null);
+        setPendingLeaveMeetingId(null);
+        setDyteCallOpen(true);
+    }, []);
+
     const selectedChannel = useMemo(() => {
         if (selectedChannelId == null) return null;
         return myChannels.find((channel) => channel.id === selectedChannelId) || null;
     }, [myChannels, selectedChannelId]);
+
+    const activeCallByChannel = useMemo(() => {
+        const map = new Map<string, DbChatCallSession>();
+        for (const session of callSessions) {
+            if (session.status !== 'active' || session.endedAt !== NONE_U64) continue;
+            const key = String(session.channelId);
+            const existing = map.get(key);
+            if (!existing || Number(session.updatedAt) > Number(existing.updatedAt)) {
+                map.set(key, session);
+            }
+        }
+        return map;
+    }, [callSessions]);
+
+    const callParticipantsBySession = useMemo(() => {
+        const map = new Map<string, DbChatCallParticipant[]>();
+        for (const participant of callParticipants) {
+            if (participant.leftAt !== NONE_U64) continue;
+            const key = String(participant.callSessionId);
+            const existing = map.get(key);
+            if (existing) {
+                existing.push(participant);
+            } else {
+                map.set(key, [participant]);
+            }
+        }
+        return map;
+    }, [callParticipants]);
+
+    const selectedChannelActiveCall = useMemo(() => {
+        if (selectedChannelId == null) return null;
+        return activeCallByChannel.get(String(selectedChannelId)) || null;
+    }, [activeCallByChannel, selectedChannelId]);
+
+    const selectedChannelActiveCallParticipants = useMemo(() => {
+        if (!selectedChannelActiveCall) return [];
+        return callParticipantsBySession.get(String(selectedChannelActiveCall.id)) || [];
+    }, [callParticipantsBySession, selectedChannelActiveCall]);
+
+    const selectedChannelActiveCallParticipantNames = useMemo(() => {
+        return selectedChannelActiveCallParticipants
+            .map((participant) => userById.get(String(participant.userId))?.name || null)
+            .filter((name): name is string => !!name)
+            .slice(0, 4);
+    }, [selectedChannelActiveCallParticipants, userById]);
 
     const selectedChannelMessages = useMemo(() => {
         if (selectedChannelId == null) return [];
@@ -545,6 +652,64 @@ export function ChatPage() {
         typingSyncRef.current = '';
     }, [selectedChannelId]);
 
+    useEffect(() => {
+        if (!dyteCallOpen || dyteCallSessionId != null || !dyteCallMeetingId) return;
+        const matched = callSessions.find(
+            (session) =>
+                session.dyteMeetingId === dyteCallMeetingId &&
+                session.status === 'active' &&
+                session.endedAt === NONE_U64
+        );
+        if (matched) {
+            setDyteCallSessionId(matched.id);
+            patchActiveCallSnapshot({ callSessionId: String(matched.id) });
+        }
+    }, [callSessions, dyteCallMeetingId, dyteCallOpen, dyteCallSessionId]);
+
+    useEffect(() => {
+        if (!dyteCallOpen || dyteCallSessionId == null) return;
+        const active = callSessions.find((session) => session.id === dyteCallSessionId) || null;
+        if (!active || active.status !== 'active' || active.endedAt !== NONE_U64) {
+            setDyteCallOpen(false);
+            setDyteAuthToken(null);
+            setDyteCallTitle('');
+            setDyteCallSessionId(null);
+            setDyteCallChannelId(null);
+            setDyteCallMeetingId(null);
+            setPendingLeaveMeetingId(null);
+            clearActiveCallSnapshot();
+            toast.message('Call ended');
+        }
+    }, [callSessions, dyteCallOpen, dyteCallSessionId]);
+
+    useEffect(() => {
+        if (!pendingLeaveMeetingId) return;
+        const pendingSession = callSessions.find(
+            (session) =>
+                session.dyteMeetingId === pendingLeaveMeetingId &&
+                session.status === 'active' &&
+                session.endedAt === NONE_U64
+        );
+        if (!pendingSession) return;
+
+        setPendingLeaveMeetingId(null);
+        void leaveChannelCallReducer({ callSessionId: pendingSession.id }).catch(() => {
+            // Best-effort cleanup for leave race cases.
+        });
+    }, [callSessions, leaveChannelCallReducer, pendingLeaveMeetingId]);
+
+    useEffect(() => {
+        if (!dyteCallOpen || !dyteAuthToken) return;
+        patchActiveCallSnapshot({
+            open: true,
+            authToken: dyteAuthToken,
+            title: dyteCallTitle,
+            channelId: dyteCallChannelId == null ? null : String(dyteCallChannelId),
+            meetingId: dyteCallMeetingId,
+            callSessionId: dyteCallSessionId == null ? null : String(dyteCallSessionId),
+        });
+    }, [dyteAuthToken, dyteCallChannelId, dyteCallMeetingId, dyteCallOpen, dyteCallSessionId, dyteCallTitle]);
+
     const handleCreateDM = async (targetUserId: bigint) => {
         if (orgId == null || currentUser == null) return;
 
@@ -653,6 +818,288 @@ export function ChatPage() {
         setThreadComposerFocusSignal((current) => current + 1);
     };
 
+    const openDyteCallDialog = (args: {
+        authToken: string;
+        title: string;
+        channelId: bigint;
+        meetingId: string;
+        callSessionId: bigint | null;
+    }) => {
+        setSelectedChannelId(args.channelId);
+        setActiveThreadParentId(null);
+        setDyteAuthToken(args.authToken);
+        setDyteCallTitle(args.title);
+        setDyteCallChannelId(args.channelId);
+        setDyteCallSessionId(args.callSessionId);
+        setDyteCallMeetingId(args.meetingId);
+        setPendingLeaveMeetingId(null);
+        setDyteCallOpen(true);
+        setActiveCallSnapshot({
+            open: true,
+            authToken: args.authToken,
+            title: args.title,
+            channelId: String(args.channelId),
+            meetingId: args.meetingId,
+            callSessionId: args.callSessionId == null ? null : String(args.callSessionId),
+        });
+    };
+
+    const handleJoinDyteCall = async (callSession: DbChatCallSession) => {
+        if (currentUser == null || dyteCallLoading) return;
+
+        setDyteCallLoading(true);
+        try {
+            const joinResult = await joinDyteMeetingAccess({
+                data: {
+                    meetingId: callSession.dyteMeetingId,
+                    channelId: String(callSession.channelId),
+                    participantName: currentUser.name || currentUser.email || 'Participant',
+                } as any,
+            });
+
+            if (!joinResult.success || !joinResult.authToken) {
+                toast.error(joinResult.error || 'Could not join call');
+                return;
+            }
+
+            await joinChannelCallReducer({ callSessionId: callSession.id });
+
+            openDyteCallDialog({
+                authToken: joinResult.authToken,
+                title: callSession.title,
+                channelId: callSession.channelId,
+                meetingId: callSession.dyteMeetingId,
+                callSessionId: callSession.id,
+            });
+            toast.success('You joined the meeting.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to join the meeting');
+        } finally {
+            setDyteCallLoading(false);
+        }
+    };
+
+    const handleJoinScheduledMeetingFromSidebar = async (meetingId: bigint) => {
+        if (currentUser == null || dyteCallLoading) return;
+        const meeting = scheduledMeetings.find((row) => row.id === meetingId) || null;
+        if (!meeting) {
+            toast.error('Meeting not found');
+            return;
+        }
+
+        if (meeting.status === 'cancelled') {
+            toast.message('This meeting was cancelled.');
+            return;
+        }
+        if (meeting.status === 'ended') {
+            toast.message('This meeting has ended.');
+            return;
+        }
+
+        const now = Date.now();
+        const joinOpenAt = Number(meeting.scheduledAt) - 10 * 60_000;
+        if (meeting.status !== 'started' && now < joinOpenAt) {
+            const mins = Math.max(1, Math.ceil((joinOpenAt - now) / 60_000));
+            toast.message(`Join opens in ${mins}m`);
+            return;
+        }
+
+        const fallbackUiChannelId =
+            meeting.channelId !== NONE_U64
+                ? meeting.channelId
+                : (selectedChannelId ?? myChannels[0]?.id ?? 0n);
+        if (fallbackUiChannelId === 0n) {
+            toast.message('Open this public meeting from Meeting Manager.');
+            return;
+        }
+
+        setJoiningScheduledMeetingId(meeting.id);
+        setDyteCallLoading(true);
+        try {
+            await joinScheduledMeetingReducer({ meetingId: meeting.id });
+
+            const joinResult = await joinDyteMeetingAccess({
+                data: {
+                    meetingId: meeting.dyteMeetingId,
+                    channelId:
+                        meeting.channelId === NONE_U64
+                            ? `public-${String(meeting.orgId)}`
+                            : String(meeting.channelId),
+                    participantName: currentUser.name || currentUser.email || 'Participant',
+                } as any,
+            });
+
+            if (!joinResult.success || !joinResult.authToken) {
+                toast.error(joinResult.error || 'Could not join meeting');
+                return;
+            }
+
+            const activeSession =
+                callSessions.find(
+                    (session) =>
+                        session.channelId === meeting.channelId &&
+                        session.dyteMeetingId === meeting.dyteMeetingId &&
+                        session.status === 'active' &&
+                        session.endedAt === NONE_U64
+                ) || null;
+
+            const callSessionId =
+                activeSession?.id ||
+                (meeting.startedCallSessionId !== NONE_U64 ? meeting.startedCallSessionId : null);
+
+            openDyteCallDialog({
+                authToken: joinResult.authToken,
+                title: meeting.title,
+                channelId: fallbackUiChannelId,
+                meetingId: meeting.dyteMeetingId,
+                callSessionId,
+            });
+            toast.success('Meeting opened');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to join meeting');
+        } finally {
+            setDyteCallLoading(false);
+            setJoiningScheduledMeetingId(null);
+        }
+    };
+
+    const handleStartDyteCall = async () => {
+        if (selectedChannel == null || currentUser == null || dyteCallLoading) return;
+
+        if (selectedChannelActiveCall) {
+            await handleJoinDyteCall(selectedChannelActiveCall);
+            return;
+        }
+
+        setDyteCallLoading(true);
+        try {
+            const createResult = await createDyteMeetingAccess({
+                data: {
+                    channelId: String(selectedChannel.id),
+                    channelName: selectedChannel.name,
+                    participantName: currentUser.name || currentUser.email || 'Participant',
+                    orgName,
+                } as any,
+            });
+
+            if (!createResult.success || !createResult.authToken || !createResult.meetingId) {
+                toast.error(createResult.error || 'Could not start video call');
+                return;
+            }
+
+            await startChannelCallReducer({
+                channelId: selectedChannel.id,
+                dyteMeetingId: createResult.meetingId,
+                title: createResult.meetingTitle || `${selectedChannel.name} call`,
+            });
+
+            openDyteCallDialog({
+                authToken: createResult.authToken,
+                title: createResult.meetingTitle || `${selectedChannel.name} call`,
+                channelId: selectedChannel.id,
+                meetingId: createResult.meetingId,
+                callSessionId: null,
+            });
+            toast.success('Meeting started.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to start the meeting');
+        } finally {
+            setDyteCallLoading(false);
+        }
+    };
+
+    const openEndCallConfirmation = () => {
+        if (!selectedChannelActiveCall) return;
+        setConfirmEndCallOpen(true);
+    };
+
+    const handleConfirmEndSelectedChannelCall = async () => {
+        if (!selectedChannelActiveCall) return;
+        setEndingCall(true);
+        try {
+            await endChannelCallReducer({ callSessionId: selectedChannelActiveCall.id });
+            toast.success('Meeting ended for all participants.');
+            setConfirmEndCallOpen(false);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to end the meeting');
+        } finally {
+            setEndingCall(false);
+        }
+    };
+
+    const handleDyteCallClose = () => {
+        const fallbackByMeeting =
+            dyteCallMeetingId == null
+                ? null
+                : callSessions.find(
+                    (session) =>
+                        session.dyteMeetingId === dyteCallMeetingId &&
+                        session.status === 'active' &&
+                        session.endedAt === NONE_U64
+                ) || null;
+
+        const fallbackSession =
+            dyteCallSessionId ??
+            (dyteCallChannelId != null
+                ? activeCallByChannel.get(String(dyteCallChannelId))?.id ?? null
+                : null) ??
+            fallbackByMeeting?.id ??
+            null;
+
+        if (fallbackSession != null) {
+            void leaveChannelCallReducer({ callSessionId: fallbackSession }).catch(() => {
+                // Best-effort leave update.
+            });
+        } else if (dyteCallMeetingId) {
+            setPendingLeaveMeetingId(dyteCallMeetingId);
+        }
+
+        setDyteCallOpen(false);
+        setDyteAuthToken(null);
+        setDyteCallTitle('');
+        setDyteCallSessionId(null);
+        setDyteCallChannelId(null);
+        setDyteCallMeetingId(null);
+        if (fallbackSession != null) {
+            setPendingLeaveMeetingId(null);
+        }
+        clearActiveCallSnapshot();
+    };
+
+    const activeCallSummaryByChannel = useMemo(() => {
+        const summary: Record<string, { title: string; participantCount: number }> = {};
+        for (const [channelKey, session] of activeCallByChannel.entries()) {
+            const count = callParticipantsBySession.get(String(session.id))?.length || 0;
+            summary[channelKey] = {
+                title: session.title,
+                participantCount: count,
+            };
+        }
+        return summary;
+    }, [activeCallByChannel, callParticipantsBySession]);
+
+    const upcomingMeetingsForSidebar = useMemo(() => {
+        if (orgId == null) return [];
+        const myChannelIds = new Set(myChannels.map((channel) => String(channel.id)));
+
+        return scheduledMeetings
+            .filter(
+                (meeting) =>
+                    meeting.orgId === orgId &&
+                    (meeting.visibility === 'public' || myChannelIds.has(String(meeting.channelId))) &&
+                    (meeting.status === 'scheduled' || meeting.status === 'started')
+            )
+            .sort((a, b) => Number(a.scheduledAt) - Number(b.scheduledAt))
+            .map((meeting) => ({
+                id: meeting.id,
+                channel_id: meeting.channelId,
+                title: meeting.title,
+                scheduled_at: meeting.scheduledAt,
+                status: meeting.status,
+                visibility: meeting.visibility,
+            }));
+    }, [myChannels, orgId, scheduledMeetings]);
+
     const sidebarChannels: SidebarChannel[] = myChannels.map((channel) => ({
         id: channel.id,
         name: channel.name,
@@ -689,10 +1136,14 @@ export function ChatPage() {
     }));
 
     const channelHeaderSubtitle = selectedChannel
-        ? selectedChannel.type === 'dm'
-            ? 'Direct message'
-            : `${selectedChannelMembers.length} members`
+        ? [
+            selectedChannel.type === 'dm' ? 'Direct message' : `${selectedChannelMembers.length} members`,
+            selectedChannelActiveCall
+                ? `${selectedChannelActiveCallParticipants.length} in call`
+                : null,
+        ].filter((part): part is string => !!part).join(' • ')
         : '';
+    const isInlineCallActive = dyteCallOpen && dyteAuthToken != null;
 
     const dmUnreadTotal = Object.entries(unreadCountsByChannel)
         .filter(([channelId]) => {
@@ -751,6 +1202,15 @@ export function ChatPage() {
                     messages={sidebarMessages}
                     unreadCountsByChannel={unreadCountsByChannel}
                     peerByChannel={peerByChannel}
+                    activeCallByChannel={activeCallSummaryByChannel}
+                    scheduledMeetings={upcomingMeetingsForSidebar}
+                    joiningMeetingId={joiningScheduledMeetingId}
+                    onJoinMeeting={(meetingId) => {
+                        void handleJoinScheduledMeetingFromSidebar(meetingId);
+                    }}
+                    onOpenMeetingManager={() => {
+                        void navigate({ to: '/meetings' });
+                    }}
                 />
             }
         >
@@ -802,7 +1262,7 @@ export function ChatPage() {
                                             maxWidth: '40vw',
                                             bgcolor: '#111111',
                                             border: '1px solid #333333',
-                                            borderRadius: 1.5,
+                                            borderRadius: appRadii.control,
                                             px: 1.1,
                                             py: 0.55,
                                             display: 'flex',
@@ -820,6 +1280,33 @@ export function ChatPage() {
                                         />
                                     </Box>
 
+                                    <Tooltip title={selectedChannelActiveCall ? 'Join active call' : 'Start video call'}>
+                                        <span>
+                                            <IconButton
+                                                onClick={() => {
+                                                    void handleStartDyteCall();
+                                                }}
+                                                disabled={dyteCallLoading}
+                                                sx={{
+                                                    color: selectedChannelActiveCall ? '#5bd589' : '#858585',
+                                                    borderRadius: appRadii.control,
+                                                    bgcolor: selectedChannelActiveCall ? 'rgba(91,213,137,0.13)' : 'transparent',
+                                                    '&:hover': {
+                                                        bgcolor: selectedChannelActiveCall ? 'rgba(91,213,137,0.2)' : 'rgba(255,255,255,0.12)',
+                                                        color: '#ffffff',
+                                                    },
+                                                    '&.Mui-disabled': { color: '#575757' },
+                                                }}
+                                            >
+                                                {dyteCallLoading ? (
+                                                    <CircularProgress size={16} sx={{ color: '#ffffff' }} />
+                                                ) : (
+                                                    <VideocamRoundedIcon sx={{ fontSize: 20 }} />
+                                                )}
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+
                                     <Tooltip title="Threads">
                                         <IconButton
                                             onClick={() => {
@@ -833,7 +1320,7 @@ export function ChatPage() {
                                             sx={{
                                                 color: activeThreadParentId ? '#ffffff' : '#858585',
                                                 bgcolor: activeThreadParentId ? 'rgba(255,255,255,0.08)' : 'transparent',
-                                                borderRadius: 1.5,
+                                                borderRadius: appRadii.control,
                                                 '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#ffffff' },
                                             }}
                                         >
@@ -851,7 +1338,7 @@ export function ChatPage() {
                                                 color: '#858585',
                                                 textTransform: 'none',
                                                 fontWeight: 600,
-                                                borderRadius: 1.5,
+                                                borderRadius: appRadii.control,
                                                 '&:hover': { borderColor: '#555555', color: '#ffffff' },
                                             }}
                                         >
@@ -865,7 +1352,7 @@ export function ChatPage() {
                                             sx={{
                                                 color: showMembersPanel ? '#ffffff' : '#858585',
                                                 bgcolor: showMembersPanel ? 'rgba(255,255,255,0.08)' : 'transparent',
-                                                borderRadius: 1.5,
+                                                borderRadius: appRadii.control,
                                                 '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#ffffff' },
                                             }}
                                         >
@@ -900,41 +1387,157 @@ export function ChatPage() {
                                 </Box>
                             )}
 
-                            <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex' }}>
-                                <MessageList
-                                    messages={messageListMessages}
-                                    users={users}
-                                    currentUserId={currentUser?.id || null}
-                                    currentUserName={currentUser?.name || ''}
-                                    searchTerm={messageSearch}
-                                    reactionsByMessage={reactionsByMessage}
-                                    replyCountByMessage={replyCountByMessage}
-                                    onToggleReaction={handleToggleReaction}
-                                    onOpenThread={openThreadFromMessage}
-                                    onReply={(message) => openThreadFromMessage(message.id)}
-                                    onEditMessage={handleEditMessage}
-                                />
+                            {selectedChannelActiveCall && !isInlineCallActive && (
+                                <Box
+                                    sx={{
+                                        px: 3,
+                                        py: 0.75,
+                                        borderBottom: '1px solid #1a1a1a',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 1.5,
+                                        bgcolor: 'rgba(8,33,20,0.45)',
+                                        backdropFilter: 'blur(6px)',
+                                    }}
+                                >
+                                    <Stack spacing={0.2} sx={{ minWidth: 0 }}>
+                                        <Stack direction="row" spacing={0.8} alignItems="center">
+                                            <Box
+                                                sx={{
+                                                    width: 8,
+                                                    height: 8,
+                                                    borderRadius: appRadii.full,
+                                                    bgcolor: '#52d07f',
+                                                    boxShadow: '0 0 0 4px rgba(82,208,127,0.18)',
+                                                }}
+                                            />
+                                            <Typography
+                                                sx={{
+                                                    color: '#e4ffe8',
+                                                    fontSize: '0.77rem',
+                                                    fontWeight: 700,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                Live call: {selectedChannelActiveCall.title}
+                                            </Typography>
+                                        </Stack>
+                                        <Typography sx={{ color: '#91c9a0', fontSize: '0.67rem' }}>
+                                            {selectedChannelActiveCallParticipants.length} participant{selectedChannelActiveCallParticipants.length === 1 ? '' : 's'}
+                                            {selectedChannelActiveCallParticipantNames.length > 0
+                                                ? ` • ${selectedChannelActiveCallParticipantNames.join(', ')}`
+                                                : ''}
+                                        </Typography>
+                                    </Stack>
+
+                                    <Stack direction="row" spacing={0.8}>
+                                        <Button
+                                            size="small"
+                                            onClick={() => void handleJoinDyteCall(selectedChannelActiveCall)}
+                                            disabled={dyteCallLoading}
+                                            sx={{
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                fontSize: '0.7rem',
+                                                minWidth: 0,
+                                                px: 1.2,
+                                                py: 0.35,
+                                                borderRadius: appRadii.control,
+                                                color: '#0c2a16',
+                                                bgcolor: '#8bf2ae',
+                                                '&:hover': { bgcolor: '#74e698' },
+                                                '&.Mui-disabled': { bgcolor: '#3d4d43', color: '#93a096' },
+                                            }}
+                                        >
+                                            Join
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={openEndCallConfirmation}
+                                            sx={{
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                fontSize: '0.7rem',
+                                                minWidth: 0,
+                                                px: 1.1,
+                                                py: 0.35,
+                                                borderRadius: appRadii.control,
+                                                color: '#ffb6b6',
+                                                border: '1px solid rgba(255,120,120,0.35)',
+                                                '&:hover': { bgcolor: 'rgba(255,120,120,0.12)' },
+                                            }}
+                                        >
+                                            End for all
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            )}
+
+                            <Box sx={{ flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
+                                {isInlineCallActive ? (
+                                    <Box sx={{ flexGrow: 1, minHeight: 0, minWidth: 0, p: 1.25, bgcolor: '#020202', overflow: 'hidden' }}>
+                                        <Box
+                                            sx={{
+                                                width: '100%',
+                                                height: '100%',
+                                                minWidth: 0,
+                                                minHeight: 0,
+                                                borderRadius: appRadii.panel,
+                                                overflow: 'hidden',
+                                                border: '1px solid #1a1a1a',
+                                                bgcolor: '#000000',
+                                            }}
+                                        >
+                                            <DyteCallInline
+                                                authToken={dyteAuthToken}
+                                                title={dyteCallTitle || `${selectedChannel.name} call`}
+                                                onClose={handleDyteCallClose}
+                                            />
+                                        </Box>
+                                    </Box>
+                                ) : (
+                                    <MessageList
+                                        messages={messageListMessages}
+                                        users={users}
+                                        currentUserId={currentUser?.id || null}
+                                        currentUserName={currentUser?.name || ''}
+                                        searchTerm={messageSearch}
+                                        reactionsByMessage={reactionsByMessage}
+                                        replyCountByMessage={replyCountByMessage}
+                                        onToggleReaction={handleToggleReaction}
+                                        onOpenThread={openThreadFromMessage}
+                                        onReply={(message) => openThreadFromMessage(message.id)}
+                                        onEditMessage={handleEditMessage}
+                                    />
+                                )}
                             </Box>
 
-                            <Typography
-                                variant="caption"
-                                sx={{ px: 3, py: 0.4, color: '#858585', fontSize: '0.72rem', minHeight: 18 }}
-                            >
-                                {othersTyping.length > 0
-                                    ? `${othersTyping.slice(0, 3).join(', ')} ${othersTyping.length > 1 ? 'are' : 'is'} typing...`
-                                    : composerTyping
-                                        ? 'You are typing...'
-                                        : ''}
-                            </Typography>
+                            {!isInlineCallActive && (
+                                <>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{ px: 3, py: 0.4, color: '#858585', fontSize: '0.72rem', minHeight: 18 }}
+                                    >
+                                        {othersTyping.length > 0
+                                            ? `${othersTyping.slice(0, 3).join(', ')} ${othersTyping.length > 1 ? 'are' : 'is'} typing...`
+                                            : composerTyping
+                                                ? 'You are typing...'
+                                                : ''}
+                                    </Typography>
 
-                            <MessageInput
-                                onSend={(content) => handleSendMessage(content, 0n)}
-                                channelId={selectedChannel.id}
-                                channelName={selectedChannel.name}
-                                mentionUsers={mentionableUsers}
-                                onTypingChange={setComposerTyping}
-                                draftScope="main"
-                            />
+                                    <MessageInput
+                                        onSend={(content) => handleSendMessage(content, 0n)}
+                                        channelId={selectedChannel.id}
+                                        channelName={selectedChannel.name}
+                                        mentionUsers={mentionableUsers}
+                                        onTypingChange={setComposerTyping}
+                                        draftScope="main"
+                                    />
+                                </>
+                            )}
                         </Box>
 
                         {activeThreadRootMessage ? (
@@ -1015,7 +1618,7 @@ export function ChatPage() {
                                             fontWeight: 700,
                                             px: 0.9,
                                             py: 0.15,
-                                            borderRadius: 1,
+                                            borderRadius: appRadii.control,
                                             bgcolor: 'rgba(116,167,255,0.14)',
                                             border: '1px solid rgba(116,167,255,0.35)',
                                             '&:hover': {
@@ -1051,6 +1654,67 @@ export function ChatPage() {
                                     draftScope={`thread-${String(activeThreadRootMessage.id)}`}
                                     onTypingChange={setComposerTyping}
                                     focusSignal={threadComposerFocusSignal}
+                                />
+                            </Box>
+                        ) : isInlineCallActive ? (
+                            <Box
+                                sx={{
+                                    width: { xs: '100%', lg: 380, xl: 420 },
+                                    borderLeft: '1px solid #1a1a1a',
+                                    bgcolor: '#050505',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        px: 2,
+                                        py: 1.2,
+                                        borderBottom: '1px solid #1a1a1a',
+                                    }}
+                                >
+                                    <Typography sx={{ color: '#ffffff', fontSize: '0.86rem', fontWeight: 700 }}>
+                                        Conversation
+                                    </Typography>
+                                    <Typography sx={{ color: '#858585', fontSize: '0.67rem' }}>
+                                        Use Reply on any message to open a thread.
+                                    </Typography>
+                                </Box>
+
+                                <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex' }}>
+                                    <MessageList
+                                        messages={messageListMessages}
+                                        users={users}
+                                        currentUserId={currentUser?.id || null}
+                                        currentUserName={currentUser?.name || ''}
+                                        searchTerm={messageSearch}
+                                        reactionsByMessage={reactionsByMessage}
+                                        replyCountByMessage={replyCountByMessage}
+                                        onToggleReaction={handleToggleReaction}
+                                        onOpenThread={openThreadFromMessage}
+                                        onReply={(message) => openThreadFromMessage(message.id)}
+                                        onEditMessage={handleEditMessage}
+                                    />
+                                </Box>
+
+                                <Typography
+                                    variant="caption"
+                                    sx={{ px: 2, py: 0.4, color: '#858585', fontSize: '0.72rem', minHeight: 18 }}
+                                >
+                                    {othersTyping.length > 0
+                                        ? `${othersTyping.slice(0, 3).join(', ')} ${othersTyping.length > 1 ? 'are' : 'is'} typing...`
+                                        : composerTyping
+                                            ? 'You are typing...'
+                                            : ''}
+                                </Typography>
+
+                                <MessageInput
+                                    onSend={(content) => handleSendMessage(content, 0n)}
+                                    channelId={selectedChannel.id}
+                                    channelName={selectedChannel.name}
+                                    mentionUsers={mentionableUsers}
+                                    onTypingChange={setComposerTyping}
+                                    draftScope="call-side"
                                 />
                             </Box>
                         ) : showMembersPanel ? (
@@ -1091,7 +1755,7 @@ export function ChatPage() {
                                                     gap: 1,
                                                     px: 1,
                                                     py: 0.7,
-                                                    borderRadius: 1.25,
+                                                    borderRadius: appRadii.card,
                                                     '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' },
                                                 }}
                                             >
@@ -1116,7 +1780,7 @@ export function ChatPage() {
                                                                 bottom: -1,
                                                                 width: 10,
                                                                 height: 10,
-                                                                borderRadius: '50%',
+                                                                borderRadius: appRadii.full,
                                                                 bgcolor: '#38c872',
                                                                 border: '2px solid #050505',
                                                             }}
@@ -1168,7 +1832,7 @@ export function ChatPage() {
                             sx={{
                                 width: 84,
                                 height: 84,
-                                borderRadius: 4,
+                                borderRadius: appRadii.panel,
                                 bgcolor: 'rgba(255,255,255,0.06)',
                                 border: '1px solid rgba(255,255,255,0.16)',
                                 display: 'grid',
@@ -1218,7 +1882,7 @@ export function ChatPage() {
                                     color: '#000000',
                                     textTransform: 'none',
                                     fontWeight: 600,
-                                    borderRadius: 2,
+                                    borderRadius: appRadii.control,
                                     px: 3,
                                     '&:hover': { bgcolor: '#e0e0e0' },
                                 }}
@@ -1234,7 +1898,7 @@ export function ChatPage() {
                                     color: '#858585',
                                     textTransform: 'none',
                                     fontWeight: 600,
-                                    borderRadius: 2,
+                                    borderRadius: appRadii.control,
                                     px: 3,
                                     '&:hover': { borderColor: '#555555', color: '#ffffff' },
                                 }}
@@ -1247,6 +1911,55 @@ export function ChatPage() {
             </Box>
 
             <Dialog
+                open={confirmEndCallOpen}
+                onClose={() => {
+                    if (!endingCall) setConfirmEndCallOpen(false);
+                }}
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#050505',
+                        border: '1px solid #333333',
+                        borderRadius: appRadii.panel,
+                        minWidth: 380,
+                    },
+                }}
+            >
+                <DialogTitle sx={{ color: '#ffffff', fontWeight: 700, fontSize: '1rem' }}>
+                    End meeting for everyone?
+                </DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ color: '#b6bcc7', fontSize: '0.86rem', mt: 0.5 }}>
+                        This will immediately disconnect all participants from the current meeting in
+                        <Box component="span" sx={{ color: '#ffffff', fontWeight: 700 }}> #{selectedChannel?.name || 'this channel'}</Box>.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => setConfirmEndCallOpen(false)}
+                        disabled={endingCall}
+                        sx={{ color: '#858585', textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={() => void handleConfirmEndSelectedChannelCall()}
+                        disabled={endingCall}
+                        variant="contained"
+                        sx={{
+                            bgcolor: '#e33d4f',
+                            color: '#ffffff',
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            '&:hover': { bgcolor: '#cc3445' },
+                            '&.Mui-disabled': { bgcolor: '#3d2428', color: '#8f7a7f' },
+                        }}
+                    >
+                        {endingCall ? 'Ending...' : 'End Meeting'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
                 open={newChatOpen}
                 onClose={() => {
                     setNewChatOpen(false);
@@ -1256,7 +1969,7 @@ export function ChatPage() {
                     sx: {
                         bgcolor: '#050505',
                         border: '1px solid #333333',
-                        borderRadius: 2,
+                        borderRadius: appRadii.panel,
                         minWidth: 360,
                     },
                 }}
@@ -1268,7 +1981,7 @@ export function ChatPage() {
                     <Box
                         sx={{
                             border: '1px solid #333333',
-                            borderRadius: 1.5,
+                            borderRadius: appRadii.control,
                             px: 1.25,
                             py: 0.5,
                             display: 'flex',
@@ -1299,7 +2012,7 @@ export function ChatPage() {
                                     gap: 1.5,
                                     px: 1.5,
                                     py: 1,
-                                    borderRadius: 1.5,
+                                    borderRadius: appRadii.control,
                                     cursor: 'pointer',
                                     '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
                                 }}
@@ -1353,7 +2066,7 @@ export function ChatPage() {
                     sx: {
                         bgcolor: '#050505',
                         border: '1px solid #333333',
-                        borderRadius: 2,
+                        borderRadius: appRadii.panel,
                         minWidth: 380,
                     },
                 }}
@@ -1447,7 +2160,7 @@ export function ChatPage() {
                     sx: {
                         bgcolor: '#050505',
                         border: '1px solid #333333',
-                        borderRadius: 2,
+                        borderRadius: appRadii.panel,
                         minWidth: 380,
                     },
                 }}
@@ -1524,6 +2237,7 @@ export function ChatPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
         </DashboardLayout>
     );
 }

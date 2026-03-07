@@ -1,4 +1,5 @@
 import { alpha, createTheme } from '@mui/material/styles';
+import { appRadii } from './radii';
 
 const sharedTypography = {
     fontFamily: "'Instrument Sans', 'IBM Plex Sans', sans-serif",
@@ -50,7 +51,7 @@ const sharedComponents = {
     MuiButton: {
         styleOverrides: {
             root: {
-                borderRadius: 18,
+                borderRadius: appRadii.control,
                 padding: '12px 24px',
                 fontSize: '0.9375rem',
             },
@@ -71,7 +72,7 @@ const sharedComponents = {
         styleOverrides: {
             root: {
                 '& .MuiOutlinedInput-root': {
-                    borderRadius: 20,
+                    borderRadius: appRadii.control,
                 },
             },
         },
@@ -79,7 +80,7 @@ const sharedComponents = {
     MuiCard: {
         styleOverrides: {
             root: {
-                borderRadius: 24,
+                borderRadius: appRadii.panel,
             },
         },
         defaultProps: {
@@ -89,14 +90,14 @@ const sharedComponents = {
     MuiPaper: {
         styleOverrides: {
             root: {
-                borderRadius: 24,
+                borderRadius: appRadii.panel,
             },
         },
     },
     MuiChip: {
         styleOverrides: {
             root: {
-                borderRadius: 999,
+                borderRadius: appRadii.badge,
                 fontWeight: 600,
                 letterSpacing: '-0.01em',
             },
@@ -105,7 +106,7 @@ const sharedComponents = {
     MuiIconButton: {
         styleOverrides: {
             root: {
-                borderRadius: 16,
+                borderRadius: appRadii.control,
             },
         },
     },
@@ -156,14 +157,14 @@ export const lightTheme = createTheme({
             lineHeight: 1.6,
         },
     },
-    shape: { borderRadius: 20 },
+    shape: { borderRadius: appRadii.shape },
     components: {
         ...sharedComponents,
         MuiCard: {
             ...sharedComponents.MuiCard,
             styleOverrides: {
                 root: {
-                    borderRadius: 24,
+                    borderRadius: appRadii.panel,
                     border: '1px solid rgba(18, 26, 29, 0.08)',
                     boxShadow: '0 18px 48px rgba(18, 26, 29, 0.08)',
                     backgroundImage: 'none',
@@ -176,7 +177,7 @@ export const lightTheme = createTheme({
             ...sharedComponents.MuiPaper,
             styleOverrides: {
                 root: {
-                    borderRadius: 24,
+                    borderRadius: appRadii.panel,
                     backgroundImage: 'none',
                     backgroundColor: alpha('#fbf7f0', 0.92),
                     backdropFilter: 'blur(14px)',
@@ -197,7 +198,7 @@ export const lightTheme = createTheme({
             styleOverrides: {
                 root: {
                     '& .MuiOutlinedInput-root': {
-                        borderRadius: 20,
+                        borderRadius: appRadii.control,
                         backgroundColor: alpha('#ffffff', 0.7),
                     },
                 },
@@ -251,14 +252,14 @@ export const darkTheme = createTheme({
             lineHeight: 1.6,
         },
     },
-    shape: { borderRadius: 20 },
+    shape: { borderRadius: appRadii.shape },
     components: {
         ...sharedComponents,
         MuiCard: {
             ...sharedComponents.MuiCard,
             styleOverrides: {
                 root: {
-                    borderRadius: 24,
+                    borderRadius: appRadii.panel,
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     boxShadow: '0 24px 72px rgba(0, 0, 0, 0.30)',
                     backgroundImage: 'none',
@@ -271,7 +272,7 @@ export const darkTheme = createTheme({
             ...sharedComponents.MuiPaper,
             styleOverrides: {
                 root: {
-                    borderRadius: 24,
+                    borderRadius: appRadii.panel,
                     backgroundImage: 'none',
                     backgroundColor: alpha('#0f1a1d', 0.9),
                     backdropFilter: 'blur(14px)',
@@ -292,7 +293,7 @@ export const darkTheme = createTheme({
             styleOverrides: {
                 root: {
                     '& .MuiOutlinedInput-root': {
-                        borderRadius: 20,
+                        borderRadius: appRadii.control,
                         backgroundColor: alpha('#142225', 0.7),
                     },
                 },

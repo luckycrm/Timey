@@ -12,6 +12,7 @@ import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import AddReactionRoundedIcon from '@mui/icons-material/AddReactionRounded';
 import AlternateEmailRoundedIcon from '@mui/icons-material/AlternateEmailRounded';
 import { chatColors } from '../../theme/chatColors';
+import { appRadii } from '../../theme/radii';
 
 interface MessageInputProps {
     onSend: (content: string) => Promise<void> | void;
@@ -225,7 +226,7 @@ export function MessageInput({
             <Box
                 sx={{
                     bgcolor: chatColors.inputBg,
-                    borderRadius: 2,
+                    borderRadius: appRadii.control,
                     px: 2,
                     py: 1,
                     display: 'flex',
@@ -308,7 +309,7 @@ export function MessageInput({
                         bgcolor: value.trim() ? chatColors.actionBg : 'transparent',
                         width: 32,
                         height: 32,
-                        borderRadius: 1.5,
+                        borderRadius: appRadii.control,
                         transition: 'all 0.2s',
                         '&:hover': {
                             bgcolor: value.trim() ? chatColors.actionBgHover : chatColors.hover,
@@ -324,7 +325,7 @@ export function MessageInput({
                     sx={{
                         mt: 0.55,
                         border: `1px solid ${chatColors.borderStrong}`,
-                        borderRadius: 1.5,
+                        borderRadius: appRadii.panel,
                         bgcolor: chatColors.panelBg,
                         overflow: 'hidden',
                     }}
@@ -392,6 +393,7 @@ export function MessageInput({
                         sx: {
                             bgcolor: chatColors.panelBg,
                             border: `1px solid ${chatColors.borderStrong}`,
+                            borderRadius: appRadii.card,
                         },
                     },
                 }}

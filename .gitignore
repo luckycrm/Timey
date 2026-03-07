@@ -12,6 +12,7 @@ dist
 *.log
 .env
 .env.local
+examples/dyte/
 
 
 spacetime.local.json

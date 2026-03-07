@@ -10,6 +10,31 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const ChatCallParticipant = __t.object("ChatCallParticipant", {
+  id: __t.u64(),
+  callSessionId: __t.u64(),
+  channelId: __t.u64(),
+  userId: __t.u64(),
+  joinedAt: __t.u64(),
+  leftAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type ChatCallParticipant = __Infer<typeof ChatCallParticipant>;
+
+export const ChatCallSession = __t.object("ChatCallSession", {
+  id: __t.u64(),
+  channelId: __t.u64(),
+  orgId: __t.u64(),
+  dyteMeetingId: __t.string(),
+  title: __t.string(),
+  startedByUserId: __t.u64(),
+  status: __t.string(),
+  startedAt: __t.u64(),
+  endedAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type ChatCallSession = __Infer<typeof ChatCallSession>;
+
 export const ChatChannel = __t.object("ChatChannel", {
   id: __t.u64(),
   orgId: __t.u64(),
@@ -59,6 +84,23 @@ export const ChatReadState = __t.object("ChatReadState", {
 });
 export type ChatReadState = __Infer<typeof ChatReadState>;
 
+export const ChatScheduledMeeting = __t.object("ChatScheduledMeeting", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  channelId: __t.u64(),
+  visibility: __t.string(),
+  title: __t.string(),
+  description: __t.string(),
+  scheduledAt: __t.u64(),
+  dyteMeetingId: __t.string(),
+  createdByUserId: __t.u64(),
+  status: __t.string(),
+  startedCallSessionId: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type ChatScheduledMeeting = __Infer<typeof ChatScheduledMeeting>;
+
 export const ChatTyping = __t.object("ChatTyping", {
   id: __t.u64(),
   channelId: __t.u64(),
@@ -86,6 +128,141 @@ export const JoinId = __t.object("JoinId", {
   createdAt: __t.u64(),
 });
 export type JoinId = __Infer<typeof JoinId>;
+
+export const MeetingActivity = __t.object("MeetingActivity", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  actorUserId: __t.u64(),
+  bookingId: __t.u64(),
+  meetingId: __t.u64(),
+  eventType: __t.string(),
+  description: __t.string(),
+  metadataJson: __t.string(),
+  createdAt: __t.u64(),
+});
+export type MeetingActivity = __Infer<typeof MeetingActivity>;
+
+export const MeetingAvailabilityRule = __t.object("MeetingAvailabilityRule", {
+  id: __t.u64(),
+  eventTypeId: __t.u64(),
+  userId: __t.u64(),
+  weekday: __t.u64(),
+  startMinute: __t.u64(),
+  endMinute: __t.u64(),
+  timezone: __t.string(),
+  isEnabled: __t.bool(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingAvailabilityRule = __Infer<typeof MeetingAvailabilityRule>;
+
+export const MeetingBooking = __t.object("MeetingBooking", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  eventTypeId: __t.u64(),
+  scheduledMeetingId: __t.u64(),
+  hostUserId: __t.u64(),
+  bookedByUserId: __t.u64(),
+  inviteeName: __t.string(),
+  inviteeEmail: __t.string(),
+  inviteeTimezone: __t.string(),
+  startsAt: __t.u64(),
+  endsAt: __t.u64(),
+  status: __t.string(),
+  bookingToken: __t.string(),
+  notes: __t.string(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingBooking = __Infer<typeof MeetingBooking>;
+
+export const MeetingEventType = __t.object("MeetingEventType", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  ownerUserId: __t.u64(),
+  slug: __t.string(),
+  title: __t.string(),
+  description: __t.string(),
+  durationMin: __t.u64(),
+  visibility: __t.string(),
+  defaultChannelId: __t.u64(),
+  requireApproval: __t.bool(),
+  isActive: __t.bool(),
+  maxDaysInAdvance: __t.u64(),
+  minNoticeMin: __t.u64(),
+  bufferBeforeMin: __t.u64(),
+  bufferAfterMin: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingEventType = __Infer<typeof MeetingEventType>;
+
+export const MeetingFollowupTemplate = __t.object("MeetingFollowupTemplate", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  createdByUserId: __t.u64(),
+  title: __t.string(),
+  itemsJson: __t.string(),
+  isDefault: __t.bool(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingFollowupTemplate = __Infer<typeof MeetingFollowupTemplate>;
+
+export const MeetingPublicProfile = __t.object("MeetingPublicProfile", {
+  userId: __t.u64(),
+  orgId: __t.u64(),
+  handle: __t.string(),
+  headline: __t.string(),
+  timezone: __t.string(),
+  bookingEnabled: __t.bool(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingPublicProfile = __Infer<typeof MeetingPublicProfile>;
+
+export const MeetingRecordingPolicy = __t.object("MeetingRecordingPolicy", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  mode: __t.string(),
+  autoRecord: __t.bool(),
+  retentionDays: __t.u64(),
+  description: __t.string(),
+  createdByUserId: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingRecordingPolicy = __Infer<typeof MeetingRecordingPolicy>;
+
+export const MeetingReminderDelivery = __t.object("MeetingReminderDelivery", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  bookingId: __t.u64(),
+  templateId: __t.u64(),
+  offsetMin: __t.u64(),
+  triggerAt: __t.u64(),
+  status: __t.string(),
+  attempts: __t.u64(),
+  lastError: __t.string(),
+  sentAt: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingReminderDelivery = __Infer<typeof MeetingReminderDelivery>;
+
+export const MeetingReminderTemplate = __t.object("MeetingReminderTemplate", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  createdByUserId: __t.u64(),
+  name: __t.string(),
+  offsetsJson: __t.string(),
+  channelScope: __t.string(),
+  isDefault: __t.bool(),
+  isActive: __t.bool(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type MeetingReminderTemplate = __Infer<typeof MeetingReminderTemplate>;
 
 export const Organization = __t.object("Organization", {
   id: __t.u64(),

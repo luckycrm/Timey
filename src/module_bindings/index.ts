@@ -35,31 +35,68 @@ import {
 
 // Import all reducer arg schemas
 import AddChannelMemberReducer from "./add_channel_member_reducer";
+import ApproveMeetingBookingReducer from "./approve_meeting_booking_reducer";
+import CancelMeetingBookingReducer from "./cancel_meeting_booking_reducer";
+import CancelMeetingBookingByTokenReducer from "./cancel_meeting_booking_by_token_reducer";
+import CancelScheduledMeetingReducer from "./cancel_scheduled_meeting_reducer";
 import CreateChannelReducer from "./create_channel_reducer";
 import CreateInviteReducer from "./create_invite_reducer";
+import CreateMeetingBookingReducer from "./create_meeting_booking_reducer";
+import CreateMeetingEventTypeReducer from "./create_meeting_event_type_reducer";
+import CreateMeetingFollowupTemplateReducer from "./create_meeting_followup_template_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
+import CreateScheduledMeetingReducer from "./create_scheduled_meeting_reducer";
 import EditMessageReducer from "./edit_message_reducer";
+import EndChannelCallReducer from "./end_channel_call_reducer";
 import GenerateJoinIdReducer from "./generate_join_id_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
+import JoinChannelCallReducer from "./join_channel_call_reducer";
 import JoinOrganizationReducer from "./join_organization_reducer";
+import JoinScheduledMeetingReducer from "./join_scheduled_meeting_reducer";
+import LeaveChannelCallReducer from "./leave_channel_call_reducer";
 import MarkChannelReadReducer from "./mark_channel_read_reducer";
+import MarkMeetingReminderDeliveryStatusReducer from "./mark_meeting_reminder_delivery_status_reducer";
+import QueueMeetingReminderDeliveriesReducer from "./queue_meeting_reminder_deliveries_reducer";
 import RegisterUserReducer from "./register_user_reducer";
+import RejectMeetingBookingReducer from "./reject_meeting_booking_reducer";
+import RescheduleMeetingBookingReducer from "./reschedule_meeting_booking_reducer";
+import RescheduleMeetingBookingByTokenReducer from "./reschedule_meeting_booking_by_token_reducer";
+import RescheduleScheduledMeetingReducer from "./reschedule_scheduled_meeting_reducer";
 import SendMessageReducer from "./send_message_reducer";
+import SetMeetingAvailabilityRulesReducer from "./set_meeting_availability_rules_reducer";
+import SetMeetingRecordingPolicyReducer from "./set_meeting_recording_policy_reducer";
+import SetMeetingReminderTemplateReducer from "./set_meeting_reminder_template_reducer";
 import SetTypingReducer from "./set_typing_reducer";
+import StartChannelCallReducer from "./start_channel_call_reducer";
 import ToggleReactionReducer from "./toggle_reaction_reducer";
+import UpdateMeetingEventTypeReducer from "./update_meeting_event_type_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
+import UpdateScheduledMeetingReducer from "./update_scheduled_meeting_reducer";
+import UpsertMeetingPublicProfileReducer from "./upsert_meeting_public_profile_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import ChatCallParticipantRow from "./chat_call_participant_table";
+import ChatCallSessionRow from "./chat_call_session_table";
 import ChatChannelRow from "./chat_channel_table";
 import ChatChannelMemberRow from "./chat_channel_member_table";
 import ChatMessageRow from "./chat_message_table";
 import ChatReactionRow from "./chat_reaction_table";
 import ChatReadStateRow from "./chat_read_state_table";
+import ChatScheduledMeetingRow from "./chat_scheduled_meeting_table";
 import ChatTypingRow from "./chat_typing_table";
 import InviteRow from "./invite_table";
 import JoinIdRow from "./join_id_table";
+import MeetingActivityRow from "./meeting_activity_table";
+import MeetingAvailabilityRuleRow from "./meeting_availability_rule_table";
+import MeetingBookingRow from "./meeting_booking_table";
+import MeetingEventTypeRow from "./meeting_event_type_table";
+import MeetingFollowupTemplateRow from "./meeting_followup_template_table";
+import MeetingPublicProfileRow from "./meeting_public_profile_table";
+import MeetingRecordingPolicyRow from "./meeting_recording_policy_table";
+import MeetingReminderDeliveryRow from "./meeting_reminder_delivery_table";
+import MeetingReminderTemplateRow from "./meeting_reminder_template_table";
 import OrganizationRow from "./organization_table";
 import OrganizationMemberRow from "./organization_member_table";
 import UserRow from "./user_table";
@@ -69,6 +106,49 @@ import UserPresenceRow from "./user_presence_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  chat_call_participant: __table({
+    name: 'chat_call_participant',
+    indexes: [
+      { name: 'call_session_id', algorithm: 'btree', columns: [
+        'callSessionId',
+      ] },
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_call_participant_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatCallParticipantRow),
+  chat_call_session: __table({
+    name: 'chat_call_session',
+    indexes: [
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'started_by_user_id', algorithm: 'btree', columns: [
+        'startedByUserId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_call_session_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatCallSessionRow),
   chat_channel: __table({
     name: 'chat_channel',
     indexes: [
@@ -154,6 +234,41 @@ const tablesSchema = __schema({
       { name: 'chat_read_state_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ChatReadStateRow),
+  chat_scheduled_meeting: __table({
+    name: 'chat_scheduled_meeting',
+    indexes: [
+      { name: 'channel_id', algorithm: 'btree', columns: [
+        'channelId',
+      ] },
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'dyte_meeting_id', algorithm: 'btree', columns: [
+        'dyteMeetingId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'scheduled_at', algorithm: 'btree', columns: [
+        'scheduledAt',
+      ] },
+      { name: 'started_call_session_id', algorithm: 'btree', columns: [
+        'startedCallSessionId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'visibility', algorithm: 'btree', columns: [
+        'visibility',
+      ] },
+    ],
+    constraints: [
+      { name: 'chat_scheduled_meeting_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ChatScheduledMeetingRow),
   chat_typing: __table({
     name: 'chat_typing',
     indexes: [
@@ -206,6 +321,218 @@ const tablesSchema = __schema({
       { name: 'join_id_token_key', constraint: 'unique', columns: ['token'] },
     ],
   }, JoinIdRow),
+  meeting_activity: __table({
+    name: 'meeting_activity',
+    indexes: [
+      { name: 'actor_user_id', algorithm: 'btree', columns: [
+        'actorUserId',
+      ] },
+      { name: 'booking_id', algorithm: 'btree', columns: [
+        'bookingId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'event_type', algorithm: 'btree', columns: [
+        'eventType',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'meeting_id', algorithm: 'btree', columns: [
+        'meetingId',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_activity_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingActivityRow),
+  meeting_availability_rule: __table({
+    name: 'meeting_availability_rule',
+    indexes: [
+      { name: 'event_type_id', algorithm: 'btree', columns: [
+        'eventTypeId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+      { name: 'weekday', algorithm: 'btree', columns: [
+        'weekday',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_availability_rule_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingAvailabilityRuleRow),
+  meeting_booking: __table({
+    name: 'meeting_booking',
+    indexes: [
+      { name: 'booked_by_user_id', algorithm: 'btree', columns: [
+        'bookedByUserId',
+      ] },
+      { name: 'booking_token', algorithm: 'btree', columns: [
+        'bookingToken',
+      ] },
+      { name: 'ends_at', algorithm: 'btree', columns: [
+        'endsAt',
+      ] },
+      { name: 'event_type_id', algorithm: 'btree', columns: [
+        'eventTypeId',
+      ] },
+      { name: 'host_user_id', algorithm: 'btree', columns: [
+        'hostUserId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'invitee_email', algorithm: 'btree', columns: [
+        'inviteeEmail',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'scheduled_meeting_id', algorithm: 'btree', columns: [
+        'scheduledMeetingId',
+      ] },
+      { name: 'starts_at', algorithm: 'btree', columns: [
+        'startsAt',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_booking_booking_token_key', constraint: 'unique', columns: ['bookingToken'] },
+      { name: 'meeting_booking_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingBookingRow),
+  meeting_event_type: __table({
+    name: 'meeting_event_type',
+    indexes: [
+      { name: 'default_channel_id', algorithm: 'btree', columns: [
+        'defaultChannelId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'owner_user_id', algorithm: 'btree', columns: [
+        'ownerUserId',
+      ] },
+      { name: 'slug', algorithm: 'btree', columns: [
+        'slug',
+      ] },
+      { name: 'visibility', algorithm: 'btree', columns: [
+        'visibility',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_event_type_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingEventTypeRow),
+  meeting_followup_template: __table({
+    name: 'meeting_followup_template',
+    indexes: [
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_followup_template_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingFollowupTemplateRow),
+  meeting_public_profile: __table({
+    name: 'meeting_public_profile',
+    indexes: [
+      { name: 'handle', algorithm: 'btree', columns: [
+        'handle',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'user_id', algorithm: 'btree', columns: [
+        'userId',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_public_profile_handle_key', constraint: 'unique', columns: ['handle'] },
+      { name: 'meeting_public_profile_user_id_key', constraint: 'unique', columns: ['userId'] },
+    ],
+  }, MeetingPublicProfileRow),
+  meeting_recording_policy: __table({
+    name: 'meeting_recording_policy',
+    indexes: [
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_recording_policy_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingRecordingPolicyRow),
+  meeting_reminder_delivery: __table({
+    name: 'meeting_reminder_delivery',
+    indexes: [
+      { name: 'booking_id', algorithm: 'btree', columns: [
+        'bookingId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'template_id', algorithm: 'btree', columns: [
+        'templateId',
+      ] },
+      { name: 'trigger_at', algorithm: 'btree', columns: [
+        'triggerAt',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_reminder_delivery_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingReminderDeliveryRow),
+  meeting_reminder_template: __table({
+    name: 'meeting_reminder_template',
+    indexes: [
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'meeting_reminder_template_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MeetingReminderTemplateRow),
   organization: __table({
     name: 'organization',
     indexes: [
@@ -275,19 +602,44 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_channel_member", AddChannelMemberReducer),
+  __reducerSchema("approve_meeting_booking", ApproveMeetingBookingReducer),
+  __reducerSchema("cancel_meeting_booking", CancelMeetingBookingReducer),
+  __reducerSchema("cancel_meeting_booking_by_token", CancelMeetingBookingByTokenReducer),
+  __reducerSchema("cancel_scheduled_meeting", CancelScheduledMeetingReducer),
   __reducerSchema("create_channel", CreateChannelReducer),
   __reducerSchema("create_invite", CreateInviteReducer),
+  __reducerSchema("create_meeting_booking", CreateMeetingBookingReducer),
+  __reducerSchema("create_meeting_event_type", CreateMeetingEventTypeReducer),
+  __reducerSchema("create_meeting_followup_template", CreateMeetingFollowupTemplateReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
+  __reducerSchema("create_scheduled_meeting", CreateScheduledMeetingReducer),
   __reducerSchema("edit_message", EditMessageReducer),
+  __reducerSchema("end_channel_call", EndChannelCallReducer),
   __reducerSchema("generate_join_id", GenerateJoinIdReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
+  __reducerSchema("join_channel_call", JoinChannelCallReducer),
   __reducerSchema("join_organization", JoinOrganizationReducer),
+  __reducerSchema("join_scheduled_meeting", JoinScheduledMeetingReducer),
+  __reducerSchema("leave_channel_call", LeaveChannelCallReducer),
   __reducerSchema("mark_channel_read", MarkChannelReadReducer),
+  __reducerSchema("mark_meeting_reminder_delivery_status", MarkMeetingReminderDeliveryStatusReducer),
+  __reducerSchema("queue_meeting_reminder_deliveries", QueueMeetingReminderDeliveriesReducer),
   __reducerSchema("register_user", RegisterUserReducer),
+  __reducerSchema("reject_meeting_booking", RejectMeetingBookingReducer),
+  __reducerSchema("reschedule_meeting_booking", RescheduleMeetingBookingReducer),
+  __reducerSchema("reschedule_meeting_booking_by_token", RescheduleMeetingBookingByTokenReducer),
+  __reducerSchema("reschedule_scheduled_meeting", RescheduleScheduledMeetingReducer),
   __reducerSchema("send_message", SendMessageReducer),
+  __reducerSchema("set_meeting_availability_rules", SetMeetingAvailabilityRulesReducer),
+  __reducerSchema("set_meeting_recording_policy", SetMeetingRecordingPolicyReducer),
+  __reducerSchema("set_meeting_reminder_template", SetMeetingReminderTemplateReducer),
   __reducerSchema("set_typing", SetTypingReducer),
+  __reducerSchema("start_channel_call", StartChannelCallReducer),
   __reducerSchema("toggle_reaction", ToggleReactionReducer),
+  __reducerSchema("update_meeting_event_type", UpdateMeetingEventTypeReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
+  __reducerSchema("update_scheduled_meeting", UpdateScheduledMeetingReducer),
+  __reducerSchema("upsert_meeting_public_profile", UpsertMeetingPublicProfileReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

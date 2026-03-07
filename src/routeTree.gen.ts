@@ -13,9 +13,20 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MembersRouteImport } from './routes/members'
+import { Route as MeetingsRouteImport } from './routes/meetings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MeetingsIndexRouteImport } from './routes/meetings.index'
+import { Route as UHandleRouteImport } from './routes/u.$handle'
+import { Route as MeetingsSettingsRouteImport } from './routes/meetings.settings'
+import { Route as MeetingsRequestsRouteImport } from './routes/meetings.requests'
+import { Route as MeetingsCalendarRouteImport } from './routes/meetings.calendar'
+import { Route as MeetingsActivityRouteImport } from './routes/meetings.activity'
+import { Route as MeetInviteTokenRouteImport } from './routes/meet.$inviteToken'
+import { Route as BookingTokenRouteImport } from './routes/booking.$token'
+import { Route as UHandleIndexRouteImport } from './routes/u.$handle.index'
+import { Route as UHandleEventTypeSlugRouteImport } from './routes/u.$handle.$eventTypeSlug'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -37,6 +48,11 @@ const MembersRoute = MembersRouteImport.update({
   path: '/members',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MeetingsRoute = MeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -52,15 +68,76 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MeetingsIndexRoute = MeetingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MeetingsRoute,
+} as any)
+const UHandleRoute = UHandleRouteImport.update({
+  id: '/u/$handle',
+  path: '/u/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetingsSettingsRoute = MeetingsSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => MeetingsRoute,
+} as any)
+const MeetingsRequestsRoute = MeetingsRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => MeetingsRoute,
+} as any)
+const MeetingsCalendarRoute = MeetingsCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => MeetingsRoute,
+} as any)
+const MeetingsActivityRoute = MeetingsActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => MeetingsRoute,
+} as any)
+const MeetInviteTokenRoute = MeetInviteTokenRouteImport.update({
+  id: '/meet/$inviteToken',
+  path: '/meet/$inviteToken',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookingTokenRoute = BookingTokenRouteImport.update({
+  id: '/booking/$token',
+  path: '/booking/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UHandleIndexRoute = UHandleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => UHandleRoute,
+} as any)
+const UHandleEventTypeSlugRoute = UHandleEventTypeSlugRouteImport.update({
+  id: '/$eventTypeSlug',
+  path: '/$eventTypeSlug',
+  getParentRoute: () => UHandleRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/meetings': typeof MeetingsRouteWithChildren
   '/members': typeof MembersRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/booking/$token': typeof BookingTokenRoute
+  '/meet/$inviteToken': typeof MeetInviteTokenRoute
+  '/meetings/activity': typeof MeetingsActivityRoute
+  '/meetings/calendar': typeof MeetingsCalendarRoute
+  '/meetings/requests': typeof MeetingsRequestsRoute
+  '/meetings/settings': typeof MeetingsSettingsRoute
+  '/u/$handle': typeof UHandleRouteWithChildren
+  '/meetings/': typeof MeetingsIndexRoute
+  '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
+  '/u/$handle/': typeof UHandleIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,16 +147,36 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/booking/$token': typeof BookingTokenRoute
+  '/meet/$inviteToken': typeof MeetInviteTokenRoute
+  '/meetings/activity': typeof MeetingsActivityRoute
+  '/meetings/calendar': typeof MeetingsCalendarRoute
+  '/meetings/requests': typeof MeetingsRequestsRoute
+  '/meetings/settings': typeof MeetingsSettingsRoute
+  '/meetings': typeof MeetingsIndexRoute
+  '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
+  '/u/$handle': typeof UHandleIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/meetings': typeof MeetingsRouteWithChildren
   '/members': typeof MembersRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/booking/$token': typeof BookingTokenRoute
+  '/meet/$inviteToken': typeof MeetInviteTokenRoute
+  '/meetings/activity': typeof MeetingsActivityRoute
+  '/meetings/calendar': typeof MeetingsCalendarRoute
+  '/meetings/requests': typeof MeetingsRequestsRoute
+  '/meetings/settings': typeof MeetingsSettingsRoute
+  '/u/$handle': typeof UHandleRouteWithChildren
+  '/meetings/': typeof MeetingsIndexRoute
+  '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
+  '/u/$handle/': typeof UHandleIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -87,10 +184,21 @@ export interface FileRouteTypes {
     | '/'
     | '/chat'
     | '/login'
+    | '/meetings'
     | '/members'
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/booking/$token'
+    | '/meet/$inviteToken'
+    | '/meetings/activity'
+    | '/meetings/calendar'
+    | '/meetings/requests'
+    | '/meetings/settings'
+    | '/u/$handle'
+    | '/meetings/'
+    | '/u/$handle/$eventTypeSlug'
+    | '/u/$handle/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,25 +208,49 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/booking/$token'
+    | '/meet/$inviteToken'
+    | '/meetings/activity'
+    | '/meetings/calendar'
+    | '/meetings/requests'
+    | '/meetings/settings'
+    | '/meetings'
+    | '/u/$handle/$eventTypeSlug'
+    | '/u/$handle'
   id:
     | '__root__'
     | '/'
     | '/chat'
     | '/login'
+    | '/meetings'
     | '/members'
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/booking/$token'
+    | '/meet/$inviteToken'
+    | '/meetings/activity'
+    | '/meetings/calendar'
+    | '/meetings/requests'
+    | '/meetings/settings'
+    | '/u/$handle'
+    | '/meetings/'
+    | '/u/$handle/$eventTypeSlug'
+    | '/u/$handle/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
   LoginRoute: typeof LoginRoute
+  MeetingsRoute: typeof MeetingsRouteWithChildren
   MembersRoute: typeof MembersRoute
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  BookingTokenRoute: typeof BookingTokenRoute
+  MeetInviteTokenRoute: typeof MeetInviteTokenRoute
+  UHandleRoute: typeof UHandleRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -151,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MembersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/meetings': {
+      id: '/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof MeetingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -172,17 +311,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/meetings/': {
+      id: '/meetings/'
+      path: '/'
+      fullPath: '/meetings/'
+      preLoaderRoute: typeof MeetingsIndexRouteImport
+      parentRoute: typeof MeetingsRoute
+    }
+    '/u/$handle': {
+      id: '/u/$handle'
+      path: '/u/$handle'
+      fullPath: '/u/$handle'
+      preLoaderRoute: typeof UHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meetings/settings': {
+      id: '/meetings/settings'
+      path: '/settings'
+      fullPath: '/meetings/settings'
+      preLoaderRoute: typeof MeetingsSettingsRouteImport
+      parentRoute: typeof MeetingsRoute
+    }
+    '/meetings/requests': {
+      id: '/meetings/requests'
+      path: '/requests'
+      fullPath: '/meetings/requests'
+      preLoaderRoute: typeof MeetingsRequestsRouteImport
+      parentRoute: typeof MeetingsRoute
+    }
+    '/meetings/calendar': {
+      id: '/meetings/calendar'
+      path: '/calendar'
+      fullPath: '/meetings/calendar'
+      preLoaderRoute: typeof MeetingsCalendarRouteImport
+      parentRoute: typeof MeetingsRoute
+    }
+    '/meetings/activity': {
+      id: '/meetings/activity'
+      path: '/activity'
+      fullPath: '/meetings/activity'
+      preLoaderRoute: typeof MeetingsActivityRouteImport
+      parentRoute: typeof MeetingsRoute
+    }
+    '/meet/$inviteToken': {
+      id: '/meet/$inviteToken'
+      path: '/meet/$inviteToken'
+      fullPath: '/meet/$inviteToken'
+      preLoaderRoute: typeof MeetInviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/booking/$token': {
+      id: '/booking/$token'
+      path: '/booking/$token'
+      fullPath: '/booking/$token'
+      preLoaderRoute: typeof BookingTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$handle/': {
+      id: '/u/$handle/'
+      path: '/'
+      fullPath: '/u/$handle/'
+      preLoaderRoute: typeof UHandleIndexRouteImport
+      parentRoute: typeof UHandleRoute
+    }
+    '/u/$handle/$eventTypeSlug': {
+      id: '/u/$handle/$eventTypeSlug'
+      path: '/$eventTypeSlug'
+      fullPath: '/u/$handle/$eventTypeSlug'
+      preLoaderRoute: typeof UHandleEventTypeSlugRouteImport
+      parentRoute: typeof UHandleRoute
+    }
   }
 }
+
+interface MeetingsRouteChildren {
+  MeetingsActivityRoute: typeof MeetingsActivityRoute
+  MeetingsCalendarRoute: typeof MeetingsCalendarRoute
+  MeetingsRequestsRoute: typeof MeetingsRequestsRoute
+  MeetingsSettingsRoute: typeof MeetingsSettingsRoute
+  MeetingsIndexRoute: typeof MeetingsIndexRoute
+}
+
+const MeetingsRouteChildren: MeetingsRouteChildren = {
+  MeetingsActivityRoute: MeetingsActivityRoute,
+  MeetingsCalendarRoute: MeetingsCalendarRoute,
+  MeetingsRequestsRoute: MeetingsRequestsRoute,
+  MeetingsSettingsRoute: MeetingsSettingsRoute,
+  MeetingsIndexRoute: MeetingsIndexRoute,
+}
+
+const MeetingsRouteWithChildren = MeetingsRoute._addFileChildren(
+  MeetingsRouteChildren,
+)
+
+interface UHandleRouteChildren {
+  UHandleEventTypeSlugRoute: typeof UHandleEventTypeSlugRoute
+  UHandleIndexRoute: typeof UHandleIndexRoute
+}
+
+const UHandleRouteChildren: UHandleRouteChildren = {
+  UHandleEventTypeSlugRoute: UHandleEventTypeSlugRoute,
+  UHandleIndexRoute: UHandleIndexRoute,
+}
+
+const UHandleRouteWithChildren =
+  UHandleRoute._addFileChildren(UHandleRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
   LoginRoute: LoginRoute,
+  MeetingsRoute: MeetingsRouteWithChildren,
   MembersRoute: MembersRoute,
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  BookingTokenRoute: BookingTokenRoute,
+  MeetInviteTokenRoute: MeetInviteTokenRoute,
+  UHandleRoute: UHandleRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

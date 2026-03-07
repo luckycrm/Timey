@@ -16,6 +16,7 @@ import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNone
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
+import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
@@ -35,20 +36,29 @@ import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
 import { AppLogo } from '../common/AppLogo';
 import { chatColors } from '../../theme/chatColors';
+import { appRadii } from '../../theme/radii';
 import { MessageList } from '../chat/MessageList';
 import { MessageInput } from '../chat/MessageInput';
+import { DyteCallInline } from '../calls/DyteCallInline';
 import { tables, reducers } from '../../module_bindings';
 import type {
+    ChatCallSession as DbChatCallSession,
     ChatChannel as DbChatChannel,
     ChatChannelMember as DbChatChannelMember,
     ChatMessage as DbChatMessage,
     ChatReaction as DbChatReaction,
     ChatReadState as DbChatReadState,
+    ChatScheduledMeeting as DbChatScheduledMeeting,
     OrganizationMember as DbOrganizationMember,
     User as DbUser,
     UserPresence as DbUserPresence,
 } from '../../module_bindings/types';
 import messageSoundUrl from '../../../assets/message.mp3';
+import {
+    ACTIVE_CALL_EVENT,
+    clearActiveCallSnapshot,
+    getActiveCallSnapshot,
+} from '../../lib/activeCall';
 
 const NONE_U64 = 18446744073709551615n;
 
@@ -62,12 +72,21 @@ interface DockMessageRow {
     edited_at?: bigint;
 }
 
+function parseBigIntOrNull(value: string | null): bigint | null {
+    if (!value) return null;
+    try {
+        return BigInt(value);
+    } catch {
+        return null;
+    }
+}
+
 const SideItem = ({ icon: Icon, label, active = false, onClick }: any) => (
     <Tooltip title={label} placement="right" arrow>
         <IconButton
             onClick={onClick}
             sx={{
-                borderRadius: 2,
+                borderRadius: appRadii.control,
                 color: active ? '#ffffff' : '#858585',
                 bgcolor: active ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
                 '&:hover': {
@@ -99,7 +118,7 @@ const WorkspaceNavItem = ({ icon: Icon, label, to = '/' }: any) => {
                     gap: 1.5,
                     px: 1.5,
                     py: 1,
-                    borderRadius: 1.5,
+                    borderRadius: appRadii.control,
                     cursor: 'pointer',
                     color: active ? '#ffffff' : '#858585',
                     bgcolor: active ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
@@ -140,15 +159,19 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
     const [allMembershipRows] = useSpacetimeDBQuery(isActive ? tables.organization_member : 'skip');
     const [allReadStates] = useSpacetimeDBQuery(isActive ? tables.chat_read_state : 'skip');
     const [allReactions] = useSpacetimeDBQuery(isActive ? tables.chat_reaction : 'skip');
+    const [allCallSessions] = useSpacetimeDBQuery(isActive ? tables.chat_call_session : 'skip');
+    const [allScheduledMeetings] = useSpacetimeDBQuery(isActive ? tables.chat_scheduled_meeting : 'skip');
     const sendMessageReducer = useReducer(reducers.sendMessage);
     const createChannelReducer = useReducer(reducers.createChannel);
     const heartbeatReducer = useReducer(reducers.heartbeat);
     const markChannelReadReducer = useReducer(reducers.markChannelRead);
     const toggleReactionReducer = useReducer(reducers.toggleReaction);
     const editMessageReducer = useReducer(reducers.editMessage);
+    const leaveChannelCallReducer = useReducer(reducers.leaveChannelCall);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const hasHydratedMessagesRef = useRef(false);
     const lastNotifiedMessageAtRef = useRef<bigint>(0n);
+    const notifiedMeetingIdsRef = useRef<Set<string>>(new Set());
     const lastMarkedDockReadRef = useRef<Record<string, string>>({});
     const [messengerSearch, setMessengerSearch] = useState('');
     const [openDmWindowIds, setOpenDmWindowIds] = useState<bigint[]>([]);
@@ -156,6 +179,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
     const [isMessengerMinimized, setIsMessengerMinimized] = useState(false);
     const [minimizedWindowIds, setMinimizedWindowIds] = useState<bigint[]>([]);
     const [activeThreadParentByChannel, setActiveThreadParentByChannel] = useState<Record<string, bigint | null>>({});
+    const [activeCallSnapshot, setActiveCallSnapshotState] = useState(() => getActiveCallSnapshot());
 
     const users = (allUsers || []) as DbUser[];
     const presenceRows = (allPresenceRows || []) as DbUserPresence[];
@@ -165,6 +189,8 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
     const membershipRows = (allMembershipRows || []) as DbOrganizationMember[];
     const readStates = (allReadStates || []) as DbChatReadState[];
     const reactions = (allReactions || []) as DbChatReaction[];
+    const callSessions = (allCallSessions || []) as DbChatCallSession[];
+    const scheduledMeetings = (allScheduledMeetings || []) as DbChatScheduledMeeting[];
     const currentDbUser = identity == null ? null : users.find((user) => user.identity.isEqual(identity)) || null;
     const currentPresence =
         currentDbUser == null
@@ -709,6 +735,84 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
     }, [channels, currentDbUser, currentPresence?.status, location.pathname, messages, myChannelIds, navigate, userById]);
 
     useEffect(() => {
+        if (currentDbUser == null || currentOrgId == null) return;
+        const activeScheduledIds = new Set(
+            scheduledMeetings
+                .filter(
+                    (meeting) =>
+                        meeting.status === 'scheduled' &&
+                        meeting.orgId === currentOrgId &&
+                        (meeting.visibility === 'public' || myChannelIds.has(String(meeting.channelId)))
+                )
+                .map((meeting) => String(meeting.id))
+        );
+
+        const next = new Set<string>();
+        for (const id of notifiedMeetingIdsRef.current) {
+            if (activeScheduledIds.has(id)) next.add(id);
+        }
+        notifiedMeetingIdsRef.current = next;
+    }, [currentDbUser, currentOrgId, myChannelIds, scheduledMeetings]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (currentDbUser == null || currentOrgId == null) return;
+
+        const now = Date.now();
+        const joinLeadMs = 10 * 60 * 1000;
+        const reminderTailMs = 5 * 60 * 1000;
+
+        const candidateMeetings = scheduledMeetings
+            .filter(
+                (meeting) =>
+                    meeting.status === 'scheduled' &&
+                    meeting.orgId === currentOrgId &&
+                    (meeting.visibility === 'public' || myChannelIds.has(String(meeting.channelId)))
+            )
+            .sort((a, b) => Number(a.scheduledAt) - Number(b.scheduledAt));
+
+        for (const meeting of candidateMeetings) {
+            const idKey = String(meeting.id);
+            if (notifiedMeetingIdsRef.current.has(idKey)) continue;
+
+            const scheduledAt = Number(meeting.scheduledAt);
+            const joinOpenAt = scheduledAt - joinLeadMs;
+            const reminderCutoff = scheduledAt + reminderTailMs;
+            if (now < joinOpenAt || now > reminderCutoff) continue;
+
+            const channelName =
+                meeting.visibility === 'public'
+                    ? 'Public meeting'
+                    : channels.find((channel) => channel.id === meeting.channelId)?.name || 'channel';
+            const startsAtLabel = new Date(scheduledAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
+            toast.message(`Meeting ready to join: ${meeting.title}`, {
+                description: `${meeting.visibility === 'public' ? channelName : `#${channelName}`} • Starts at ${startsAtLabel}. Open Meeting Manager to join.`,
+                duration: 9000,
+                id: `meeting-reminder-${idKey}`,
+            });
+
+            const isAway =
+                document.visibilityState !== 'visible' ||
+                !document.hasFocus() ||
+                currentPresence?.status === 'away';
+
+            if (isAway && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                void triggerSystemNotification(
+                    `Meeting ready: ${meeting.title}`,
+                    `${meeting.visibility === 'public' ? channelName : `#${channelName}`} starts at ${startsAtLabel}`,
+                    `timey-meeting-${idKey}`
+                );
+            }
+
+            notifiedMeetingIdsRef.current.add(idKey);
+        }
+    }, [channels, currentDbUser, currentOrgId, currentPresence?.status, myChannelIds, scheduledMeetings]);
+
+    useEffect(() => {
         if (typeof window === 'undefined') return;
         if (!isActive || currentDbUser == null) return;
         if (location.pathname.startsWith('/chat')) return;
@@ -746,6 +850,33 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
             window.removeEventListener('beforeunload', onUnload);
         };
     }, [currentDbUser, currentOrgId, heartbeatReducer, isActive, location.pathname]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sync = () => {
+            setActiveCallSnapshotState(getActiveCallSnapshot());
+        };
+
+        sync();
+        window.addEventListener(ACTIVE_CALL_EVENT, sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener(ACTIVE_CALL_EVENT, sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!activeCallSnapshot.open) return;
+        const sessionId = parseBigIntOrNull(activeCallSnapshot.callSessionId);
+        if (sessionId == null) return;
+
+        const session = callSessions.find((row) => row.id === sessionId) || null;
+        if (!session || session.status !== 'active' || session.endedAt !== NONE_U64) {
+            clearActiveCallSnapshot();
+            setActiveCallSnapshotState(getActiveCallSnapshot());
+        }
+    }, [activeCallSnapshot.callSessionId, activeCallSnapshot.open, callSessions]);
 
     useEffect(() => {
         const validChannelIds = new Set(dockChannels.map((channel) => channel.id));
@@ -807,7 +938,6 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                 const notification = new Notification(title, {
                     body,
                     tag,
-                    renotify: true,
                     requireInteraction: true,
                     silent: false,
                 });
@@ -862,8 +992,35 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
             });
     };
 
+    const handleGlobalCallClose = async () => {
+        const sessionIdFromSnapshot = parseBigIntOrNull(activeCallSnapshot.callSessionId);
+        const fallbackSession =
+            sessionIdFromSnapshot ??
+            (activeCallSnapshot.meetingId
+                ? callSessions.find(
+                    (session) =>
+                        session.dyteMeetingId === activeCallSnapshot.meetingId &&
+                        session.status === 'active' &&
+                        session.endedAt === NONE_U64
+                )?.id ?? null
+                : null);
+
+        if (fallbackSession != null) {
+            void leaveChannelCallReducer({ callSessionId: fallbackSession }).catch(() => {
+                // Best-effort leave update.
+            });
+        }
+
+        clearActiveCallSnapshot();
+        setActiveCallSnapshotState(getActiveCallSnapshot());
+    };
+
     const dockVisible = !location.pathname.startsWith('/chat');
     const dockInset = dockVisible && !isMessengerMinimized ? 336 : 0;
+    const globalCallVisible =
+        activeCallSnapshot.open &&
+        !!activeCallSnapshot.authToken &&
+        !location.pathname.startsWith('/chat');
     const openDmWindows = openDmWindowIds
         .map((channelId) => dockChannels.find((channel) => channel.id === channelId) || null)
         .filter((channel): channel is DbChatChannel => channel != null);
@@ -912,6 +1069,12 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                     onClick={() => navigate({ to: '/chat' })}
                 />
                 <SideItem
+                    icon={EventAvailableRoundedIcon}
+                    label="Meetings"
+                    active={location.pathname.startsWith('/meetings')}
+                    onClick={() => navigate({ to: '/meetings' })}
+                />
+                <SideItem
                     icon={AutoAwesomeOutlinedIcon}
                     label="AI"
                     active={location.pathname.startsWith('/ai')}
@@ -946,7 +1109,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                         justifyContent: 'space-between',
                         px: 1,
                         py: 0.5,
-                        borderRadius: 2,
+                        borderRadius: appRadii.control,
                         cursor: 'pointer',
                         '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.04)' },
                         mb: 2,
@@ -995,7 +1158,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                     borderColor: '#222',
                                     bgcolor: 'rgba(255, 255, 255, 0.02)',
                                     textTransform: 'none',
-                                    borderRadius: 2,
+                                    borderRadius: appRadii.control,
                                     py: 1,
                                     mb: 3,
                                     '&:hover': {
@@ -1011,6 +1174,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                         {/* Main Nav */}
                         <Stack spacing={0.5} sx={{ mb: 4 }}>
                             <WorkspaceNavItem icon={HomeOutlinedIcon} label="Home" to="/" />
+                            <WorkspaceNavItem icon={EventAvailableRoundedIcon} label="Meetings" to="/meetings" />
                             <WorkspaceNavItem icon={PeopleOutlineRoundedIcon} label="Members" to="/members" />
                             <WorkspaceNavItem icon={ModeEditOutlineOutlinedIcon} label="Drafts" to="/drafts" />
                             <WorkspaceNavItem icon={PersonOutlineOutlinedIcon} label="Your work" to="/work" />
@@ -1085,7 +1249,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                             flex: 0.5,
                             maxWidth: 400,
                             bgcolor: '#111',
-                            borderRadius: 2,
+                            borderRadius: appRadii.control,
                             px: 1.5,
                             py: 0.5,
                             display: 'flex',
@@ -1222,6 +1386,75 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                     {children}
                 </Box>
             </Box>
+
+            {globalCallVisible && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        right: 348,
+                        top: 76,
+                        width: 460,
+                        height: 300,
+                        borderRadius: 0,
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        bgcolor: 'rgba(5,5,5,0.82)',
+                        zIndex: 1306,
+                        boxShadow: '0 14px 34px rgba(0,0,0,0.52)',
+                        backdropFilter: 'blur(10px) saturate(120%)',
+                        WebkitBackdropFilter: 'blur(10px) saturate(120%)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            px: 1.2,
+                            py: 0.65,
+                            borderBottom: '1px solid rgba(255,255,255,0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            bgcolor: 'rgba(5,5,5,0.72)',
+                        }}
+                    >
+                        <Typography sx={{ color: '#ffffff', fontSize: '0.74rem', fontWeight: 700 }}>
+                            Active Call
+                        </Typography>
+                        <Button
+                            size="small"
+                            onClick={() => {
+                                void navigate({ to: '/chat' });
+                            }}
+                            sx={{
+                                textTransform: 'none',
+                                minWidth: 0,
+                                px: 0.9,
+                                py: 0.25,
+                                borderRadius: 1.1,
+                                color: '#9ec0ff',
+                                border: '1px solid rgba(116,167,255,0.35)',
+                                bgcolor: 'rgba(116,167,255,0.12)',
+                                '&:hover': {
+                                    bgcolor: 'rgba(116,167,255,0.22)',
+                                    borderColor: 'rgba(116,167,255,0.5)',
+                                },
+                            }}
+                        >
+                            Open chat
+                        </Button>
+                    </Box>
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
+                        <DyteCallInline
+                            authToken={activeCallSnapshot.authToken}
+                            title={activeCallSnapshot.title || 'Video Meeting'}
+                            onClose={() => {
+                                void handleGlobalCallClose();
+                            }}
+                        />
+                    </Box>
+                </Box>
+            )}
 
             {dockVisible && (
                 <>
@@ -1530,7 +1763,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                     gap: 0.7,
                                     px: 1.5,
                                     py: 0.6,
-                                    borderRadius: 1.5,
+                                    borderRadius: appRadii.control,
                                     bgcolor: 'rgba(17,17,17,0.72)',
                                     border: '1px solid rgba(255,255,255,0.08)',
                                     '&:focus-within': { borderColor: chatColors.borderHover },
@@ -1598,7 +1831,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                                     alignItems: 'center',
                                                     gap: 1.15,
                                                     cursor: 'pointer',
-                                                    borderRadius: 1.5,
+                                                    borderRadius: appRadii.control,
                                                     bgcolor: selected ? chatColors.selection : 'transparent',
                                                     '&:hover': {
                                                         bgcolor: selected ? chatColors.selectionStrong : chatColors.hover,
@@ -1659,7 +1892,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                                             minWidth: 16,
                                                             height: 16,
                                                             px: 0.4,
-                                                            borderRadius: 999,
+                                                            borderRadius: appRadii.badge,
                                                             bgcolor: chatColors.danger,
                                                             color: chatColors.textPrimary,
                                                             fontSize: '0.62rem',
@@ -1720,7 +1953,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                                     alignItems: 'center',
                                                     gap: 1.15,
                                                     cursor: 'pointer',
-                                                    borderRadius: 1.5,
+                                                    borderRadius: appRadii.control,
                                                     bgcolor: selected ? chatColors.selection : 'transparent',
                                                     '&:hover': {
                                                         bgcolor: selected ? chatColors.selectionStrong : chatColors.hover,
@@ -1765,7 +1998,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                                                             minWidth: 16,
                                                             height: 16,
                                                             px: 0.4,
-                                                            borderRadius: 999,
+                                                            borderRadius: appRadii.badge,
                                                             bgcolor: chatColors.actionBg,
                                                             color: chatColors.actionText,
                                                             fontSize: '0.62rem',

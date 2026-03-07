@@ -63,6 +63,9 @@ SESSION_SECRET=change-me
 ZEPTOMAIL_TOKEN=your-zeptomail-token
 VITE_SPACETIMEDB_HOST=https://maincloud.spacetimedb.com
 VITE_SPACETIMEDB_DB_NAME=timeydb
+DYTE_ORG_ID=your-dyte-org-id
+DYTE_API_KEY=your-dyte-api-key
+DYTE_PRESET_NAME=group_call_host
 ```
 
 ### 3. Run locally
@@ -142,6 +145,22 @@ spacetimedb/
 - Incoming message sound plays when user is away from active chat context.
 - System notifications for incoming messages work when user is away and notification permission is granted.
 - Message input and message list UI in floating chat are aligned with shared chat components.
+- Dyte video call integration is added to chat headers (start call -> open in-app Dyte meeting dialog).
+- Dyte server bridge is added (`src/server/dyte.ts`) to create meetings and participant auth tokens securely.
+- Call sessions are now chat-native via SpacetimeDB (`chat_call_session`, `chat_call_participant`) with active call discovery, join, leave, and end flows.
+- Meetings manager is live at `/meetings` with channel/public meeting scheduling and join-window enforcement.
+- Full-screen calendar view is live at `/meetings/calendar` with month/week/day/agenda modes.
+- Calendar supports drag-and-drop day-level meeting rescheduling and ICS export (per-meeting and visible-view export).
+- Meeting settings are live at `/meetings/settings` (public booking profile, event types, availability rules, recording policy, follow-up templates, reminder templates, booking activity feed).
+- Meetings manager, calendar, and settings now share a standard meetings UI shell and sidebar navigation, including quick links to chat and the user public booking page.
+- Public booking pages are available at `/u/:handle` and `/u/:handle/:eventTypeSlug`.
+- Booking approval workflow is live for event types with `requireApproval` (pending queue + approve/decline in meetings settings).
+- Public booking flow now suggests nearby alternative slots when conflict/availability errors occur.
+- Booking management links are live at `/booking/:token` (self-serve reschedule/cancel) and host controls are in meetings settings.
+- Meeting lifecycle emails are sent via ZeptoMail for booking request/confirm/decline/reschedule/cancel and scheduled-meeting notices.
+- Confirmed/rescheduled notices include `.ics` calendar invite attachments.
+- Reminder templates can queue reminder deliveries in `/meetings/settings`, with due-now bulk dispatch, manual single-send, and failure tracking.
+- Post-meeting follow-up nudges are available from meetings settings for ended bookings.
 
 ### To Do
 
@@ -149,6 +168,9 @@ spacetimedb/
 - Notification preferences UI (sound on/off, desktop notification toggle, channel-level controls).
 - Additional mobile refinements for floating messenger behavior.
 - More chat QA coverage for reconnect/offline/online transitions and multi-account switching.
+- External calendar sync (Google/Microsoft).
+- Enterprise reporting and compliance automation for meeting lifecycle.
+- See the detailed meetings plan in [docs/meetings-roadmap.md](./docs/meetings-roadmap.md).
 
 ## Contributors
 
