@@ -16,8 +16,10 @@ import { Route as MembersRouteImport } from './routes/members'
 import { Route as MeetingsRouteImport } from './routes/meetings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MeetingsIndexRouteImport } from './routes/meetings.index'
+import { Route as AiIndexRouteImport } from './routes/ai.index'
 import { Route as UHandleRouteImport } from './routes/u.$handle'
 import { Route as MeetingsSettingsRouteImport } from './routes/meetings.settings'
 import { Route as MeetingsRequestsRouteImport } from './routes/meetings.requests'
@@ -25,8 +27,23 @@ import { Route as MeetingsCalendarRouteImport } from './routes/meetings.calendar
 import { Route as MeetingsActivityRouteImport } from './routes/meetings.activity'
 import { Route as MeetInviteTokenRouteImport } from './routes/meet.$inviteToken'
 import { Route as BookingTokenRouteImport } from './routes/booking.$token'
+import { Route as AiTasksRouteImport } from './routes/ai.tasks'
+import { Route as AiSettingsRouteImport } from './routes/ai.settings'
+import { Route as AiProjectsRouteImport } from './routes/ai.projects'
+import { Route as AiOrgRouteImport } from './routes/ai.org'
+import { Route as AiInboxRouteImport } from './routes/ai.inbox'
+import { Route as AiGoalsRouteImport } from './routes/ai.goals'
+import { Route as AiCostsRouteImport } from './routes/ai.costs'
+import { Route as AiApprovalsRouteImport } from './routes/ai.approvals'
+import { Route as AiAgentsRouteImport } from './routes/ai.agents'
+import { Route as AiActivityRouteImport } from './routes/ai.activity'
 import { Route as UHandleIndexRouteImport } from './routes/u.$handle.index'
 import { Route as UHandleEventTypeSlugRouteImport } from './routes/u.$handle.$eventTypeSlug'
+import { Route as AiTasksTaskIdRouteImport } from './routes/ai.tasks.$taskId'
+import { Route as AiProjectsProjectIdRouteImport } from './routes/ai.projects.$projectId'
+import { Route as AiGoalsGoalIdRouteImport } from './routes/ai.goals.$goalId'
+import { Route as AiApprovalsApprovalIdRouteImport } from './routes/ai.approvals.$approvalId'
+import { Route as AiAgentsAgentIdRouteImport } from './routes/ai.agents.$agentId'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -63,6 +80,11 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiRoute = AiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -72,6 +94,11 @@ const MeetingsIndexRoute = MeetingsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => MeetingsRoute,
+} as any)
+const AiIndexRoute = AiIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AiRoute,
 } as any)
 const UHandleRoute = UHandleRouteImport.update({
   id: '/u/$handle',
@@ -108,6 +135,56 @@ const BookingTokenRoute = BookingTokenRouteImport.update({
   path: '/booking/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiTasksRoute = AiTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiSettingsRoute = AiSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiProjectsRoute = AiProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiOrgRoute = AiOrgRouteImport.update({
+  id: '/org',
+  path: '/org',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiInboxRoute = AiInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiGoalsRoute = AiGoalsRouteImport.update({
+  id: '/goals',
+  path: '/goals',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiCostsRoute = AiCostsRouteImport.update({
+  id: '/costs',
+  path: '/costs',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiApprovalsRoute = AiApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiAgentsRoute = AiAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiActivityRoute = AiActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AiRoute,
+} as any)
 const UHandleIndexRoute = UHandleIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -118,9 +195,35 @@ const UHandleEventTypeSlugRoute = UHandleEventTypeSlugRouteImport.update({
   path: '/$eventTypeSlug',
   getParentRoute: () => UHandleRoute,
 } as any)
+const AiTasksTaskIdRoute = AiTasksTaskIdRouteImport.update({
+  id: '/$taskId',
+  path: '/$taskId',
+  getParentRoute: () => AiTasksRoute,
+} as any)
+const AiProjectsProjectIdRoute = AiProjectsProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => AiProjectsRoute,
+} as any)
+const AiGoalsGoalIdRoute = AiGoalsGoalIdRouteImport.update({
+  id: '/$goalId',
+  path: '/$goalId',
+  getParentRoute: () => AiGoalsRoute,
+} as any)
+const AiApprovalsApprovalIdRoute = AiApprovalsApprovalIdRouteImport.update({
+  id: '/$approvalId',
+  path: '/$approvalId',
+  getParentRoute: () => AiApprovalsRoute,
+} as any)
+const AiAgentsAgentIdRoute = AiAgentsAgentIdRouteImport.update({
+  id: '/$agentId',
+  path: '/$agentId',
+  getParentRoute: () => AiAgentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai': typeof AiRouteWithChildren
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
   '/meetings': typeof MeetingsRouteWithChildren
@@ -128,6 +231,16 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/ai/activity': typeof AiActivityRoute
+  '/ai/agents': typeof AiAgentsRouteWithChildren
+  '/ai/approvals': typeof AiApprovalsRouteWithChildren
+  '/ai/costs': typeof AiCostsRoute
+  '/ai/goals': typeof AiGoalsRouteWithChildren
+  '/ai/inbox': typeof AiInboxRoute
+  '/ai/org': typeof AiOrgRoute
+  '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/settings': typeof AiSettingsRoute
+  '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
   '/meet/$inviteToken': typeof MeetInviteTokenRoute
   '/meetings/activity': typeof MeetingsActivityRoute
@@ -135,7 +248,13 @@ export interface FileRoutesByFullPath {
   '/meetings/requests': typeof MeetingsRequestsRoute
   '/meetings/settings': typeof MeetingsSettingsRoute
   '/u/$handle': typeof UHandleRouteWithChildren
+  '/ai/': typeof AiIndexRoute
   '/meetings/': typeof MeetingsIndexRoute
+  '/ai/agents/$agentId': typeof AiAgentsAgentIdRoute
+  '/ai/approvals/$approvalId': typeof AiApprovalsApprovalIdRoute
+  '/ai/goals/$goalId': typeof AiGoalsGoalIdRoute
+  '/ai/projects/$projectId': typeof AiProjectsProjectIdRoute
+  '/ai/tasks/$taskId': typeof AiTasksTaskIdRoute
   '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
   '/u/$handle/': typeof UHandleIndexRoute
 }
@@ -147,19 +266,36 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/ai/activity': typeof AiActivityRoute
+  '/ai/agents': typeof AiAgentsRouteWithChildren
+  '/ai/approvals': typeof AiApprovalsRouteWithChildren
+  '/ai/costs': typeof AiCostsRoute
+  '/ai/goals': typeof AiGoalsRouteWithChildren
+  '/ai/inbox': typeof AiInboxRoute
+  '/ai/org': typeof AiOrgRoute
+  '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/settings': typeof AiSettingsRoute
+  '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
   '/meet/$inviteToken': typeof MeetInviteTokenRoute
   '/meetings/activity': typeof MeetingsActivityRoute
   '/meetings/calendar': typeof MeetingsCalendarRoute
   '/meetings/requests': typeof MeetingsRequestsRoute
   '/meetings/settings': typeof MeetingsSettingsRoute
+  '/ai': typeof AiIndexRoute
   '/meetings': typeof MeetingsIndexRoute
+  '/ai/agents/$agentId': typeof AiAgentsAgentIdRoute
+  '/ai/approvals/$approvalId': typeof AiApprovalsApprovalIdRoute
+  '/ai/goals/$goalId': typeof AiGoalsGoalIdRoute
+  '/ai/projects/$projectId': typeof AiProjectsProjectIdRoute
+  '/ai/tasks/$taskId': typeof AiTasksTaskIdRoute
   '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
   '/u/$handle': typeof UHandleIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai': typeof AiRouteWithChildren
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
   '/meetings': typeof MeetingsRouteWithChildren
@@ -167,6 +303,16 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/ai/activity': typeof AiActivityRoute
+  '/ai/agents': typeof AiAgentsRouteWithChildren
+  '/ai/approvals': typeof AiApprovalsRouteWithChildren
+  '/ai/costs': typeof AiCostsRoute
+  '/ai/goals': typeof AiGoalsRouteWithChildren
+  '/ai/inbox': typeof AiInboxRoute
+  '/ai/org': typeof AiOrgRoute
+  '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/settings': typeof AiSettingsRoute
+  '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
   '/meet/$inviteToken': typeof MeetInviteTokenRoute
   '/meetings/activity': typeof MeetingsActivityRoute
@@ -174,7 +320,13 @@ export interface FileRoutesById {
   '/meetings/requests': typeof MeetingsRequestsRoute
   '/meetings/settings': typeof MeetingsSettingsRoute
   '/u/$handle': typeof UHandleRouteWithChildren
+  '/ai/': typeof AiIndexRoute
   '/meetings/': typeof MeetingsIndexRoute
+  '/ai/agents/$agentId': typeof AiAgentsAgentIdRoute
+  '/ai/approvals/$approvalId': typeof AiApprovalsApprovalIdRoute
+  '/ai/goals/$goalId': typeof AiGoalsGoalIdRoute
+  '/ai/projects/$projectId': typeof AiProjectsProjectIdRoute
+  '/ai/tasks/$taskId': typeof AiTasksTaskIdRoute
   '/u/$handle/$eventTypeSlug': typeof UHandleEventTypeSlugRoute
   '/u/$handle/': typeof UHandleIndexRoute
 }
@@ -182,6 +334,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai'
     | '/chat'
     | '/login'
     | '/meetings'
@@ -189,6 +342,16 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/ai/activity'
+    | '/ai/agents'
+    | '/ai/approvals'
+    | '/ai/costs'
+    | '/ai/goals'
+    | '/ai/inbox'
+    | '/ai/org'
+    | '/ai/projects'
+    | '/ai/settings'
+    | '/ai/tasks'
     | '/booking/$token'
     | '/meet/$inviteToken'
     | '/meetings/activity'
@@ -196,7 +359,13 @@ export interface FileRouteTypes {
     | '/meetings/requests'
     | '/meetings/settings'
     | '/u/$handle'
+    | '/ai/'
     | '/meetings/'
+    | '/ai/agents/$agentId'
+    | '/ai/approvals/$approvalId'
+    | '/ai/goals/$goalId'
+    | '/ai/projects/$projectId'
+    | '/ai/tasks/$taskId'
     | '/u/$handle/$eventTypeSlug'
     | '/u/$handle/'
   fileRoutesByTo: FileRoutesByTo
@@ -208,18 +377,35 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/ai/activity'
+    | '/ai/agents'
+    | '/ai/approvals'
+    | '/ai/costs'
+    | '/ai/goals'
+    | '/ai/inbox'
+    | '/ai/org'
+    | '/ai/projects'
+    | '/ai/settings'
+    | '/ai/tasks'
     | '/booking/$token'
     | '/meet/$inviteToken'
     | '/meetings/activity'
     | '/meetings/calendar'
     | '/meetings/requests'
     | '/meetings/settings'
+    | '/ai'
     | '/meetings'
+    | '/ai/agents/$agentId'
+    | '/ai/approvals/$approvalId'
+    | '/ai/goals/$goalId'
+    | '/ai/projects/$projectId'
+    | '/ai/tasks/$taskId'
     | '/u/$handle/$eventTypeSlug'
     | '/u/$handle'
   id:
     | '__root__'
     | '/'
+    | '/ai'
     | '/chat'
     | '/login'
     | '/meetings'
@@ -227,6 +413,16 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/ai/activity'
+    | '/ai/agents'
+    | '/ai/approvals'
+    | '/ai/costs'
+    | '/ai/goals'
+    | '/ai/inbox'
+    | '/ai/org'
+    | '/ai/projects'
+    | '/ai/settings'
+    | '/ai/tasks'
     | '/booking/$token'
     | '/meet/$inviteToken'
     | '/meetings/activity'
@@ -234,13 +430,20 @@ export interface FileRouteTypes {
     | '/meetings/requests'
     | '/meetings/settings'
     | '/u/$handle'
+    | '/ai/'
     | '/meetings/'
+    | '/ai/agents/$agentId'
+    | '/ai/approvals/$approvalId'
+    | '/ai/goals/$goalId'
+    | '/ai/projects/$projectId'
+    | '/ai/tasks/$taskId'
     | '/u/$handle/$eventTypeSlug'
     | '/u/$handle/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiRoute: typeof AiRouteWithChildren
   ChatRoute: typeof ChatRoute
   LoginRoute: typeof LoginRoute
   MeetingsRoute: typeof MeetingsRouteWithChildren
@@ -304,6 +507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai': {
+      id: '/ai'
+      path: '/ai'
+      fullPath: '/ai'
+      preLoaderRoute: typeof AiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -317,6 +527,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/meetings/'
       preLoaderRoute: typeof MeetingsIndexRouteImport
       parentRoute: typeof MeetingsRoute
+    }
+    '/ai/': {
+      id: '/ai/'
+      path: '/'
+      fullPath: '/ai/'
+      preLoaderRoute: typeof AiIndexRouteImport
+      parentRoute: typeof AiRoute
     }
     '/u/$handle': {
       id: '/u/$handle'
@@ -367,6 +584,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookingTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai/tasks': {
+      id: '/ai/tasks'
+      path: '/tasks'
+      fullPath: '/ai/tasks'
+      preLoaderRoute: typeof AiTasksRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/settings': {
+      id: '/ai/settings'
+      path: '/settings'
+      fullPath: '/ai/settings'
+      preLoaderRoute: typeof AiSettingsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/projects': {
+      id: '/ai/projects'
+      path: '/projects'
+      fullPath: '/ai/projects'
+      preLoaderRoute: typeof AiProjectsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/org': {
+      id: '/ai/org'
+      path: '/org'
+      fullPath: '/ai/org'
+      preLoaderRoute: typeof AiOrgRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/inbox': {
+      id: '/ai/inbox'
+      path: '/inbox'
+      fullPath: '/ai/inbox'
+      preLoaderRoute: typeof AiInboxRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/goals': {
+      id: '/ai/goals'
+      path: '/goals'
+      fullPath: '/ai/goals'
+      preLoaderRoute: typeof AiGoalsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/costs': {
+      id: '/ai/costs'
+      path: '/costs'
+      fullPath: '/ai/costs'
+      preLoaderRoute: typeof AiCostsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/approvals': {
+      id: '/ai/approvals'
+      path: '/approvals'
+      fullPath: '/ai/approvals'
+      preLoaderRoute: typeof AiApprovalsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/agents': {
+      id: '/ai/agents'
+      path: '/agents'
+      fullPath: '/ai/agents'
+      preLoaderRoute: typeof AiAgentsRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/activity': {
+      id: '/ai/activity'
+      path: '/activity'
+      fullPath: '/ai/activity'
+      preLoaderRoute: typeof AiActivityRouteImport
+      parentRoute: typeof AiRoute
+    }
     '/u/$handle/': {
       id: '/u/$handle/'
       path: '/'
@@ -381,8 +668,131 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UHandleEventTypeSlugRouteImport
       parentRoute: typeof UHandleRoute
     }
+    '/ai/tasks/$taskId': {
+      id: '/ai/tasks/$taskId'
+      path: '/$taskId'
+      fullPath: '/ai/tasks/$taskId'
+      preLoaderRoute: typeof AiTasksTaskIdRouteImport
+      parentRoute: typeof AiTasksRoute
+    }
+    '/ai/projects/$projectId': {
+      id: '/ai/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/ai/projects/$projectId'
+      preLoaderRoute: typeof AiProjectsProjectIdRouteImport
+      parentRoute: typeof AiProjectsRoute
+    }
+    '/ai/goals/$goalId': {
+      id: '/ai/goals/$goalId'
+      path: '/$goalId'
+      fullPath: '/ai/goals/$goalId'
+      preLoaderRoute: typeof AiGoalsGoalIdRouteImport
+      parentRoute: typeof AiGoalsRoute
+    }
+    '/ai/approvals/$approvalId': {
+      id: '/ai/approvals/$approvalId'
+      path: '/$approvalId'
+      fullPath: '/ai/approvals/$approvalId'
+      preLoaderRoute: typeof AiApprovalsApprovalIdRouteImport
+      parentRoute: typeof AiApprovalsRoute
+    }
+    '/ai/agents/$agentId': {
+      id: '/ai/agents/$agentId'
+      path: '/$agentId'
+      fullPath: '/ai/agents/$agentId'
+      preLoaderRoute: typeof AiAgentsAgentIdRouteImport
+      parentRoute: typeof AiAgentsRoute
+    }
   }
 }
+
+interface AiAgentsRouteChildren {
+  AiAgentsAgentIdRoute: typeof AiAgentsAgentIdRoute
+}
+
+const AiAgentsRouteChildren: AiAgentsRouteChildren = {
+  AiAgentsAgentIdRoute: AiAgentsAgentIdRoute,
+}
+
+const AiAgentsRouteWithChildren = AiAgentsRoute._addFileChildren(
+  AiAgentsRouteChildren,
+)
+
+interface AiApprovalsRouteChildren {
+  AiApprovalsApprovalIdRoute: typeof AiApprovalsApprovalIdRoute
+}
+
+const AiApprovalsRouteChildren: AiApprovalsRouteChildren = {
+  AiApprovalsApprovalIdRoute: AiApprovalsApprovalIdRoute,
+}
+
+const AiApprovalsRouteWithChildren = AiApprovalsRoute._addFileChildren(
+  AiApprovalsRouteChildren,
+)
+
+interface AiGoalsRouteChildren {
+  AiGoalsGoalIdRoute: typeof AiGoalsGoalIdRoute
+}
+
+const AiGoalsRouteChildren: AiGoalsRouteChildren = {
+  AiGoalsGoalIdRoute: AiGoalsGoalIdRoute,
+}
+
+const AiGoalsRouteWithChildren =
+  AiGoalsRoute._addFileChildren(AiGoalsRouteChildren)
+
+interface AiProjectsRouteChildren {
+  AiProjectsProjectIdRoute: typeof AiProjectsProjectIdRoute
+}
+
+const AiProjectsRouteChildren: AiProjectsRouteChildren = {
+  AiProjectsProjectIdRoute: AiProjectsProjectIdRoute,
+}
+
+const AiProjectsRouteWithChildren = AiProjectsRoute._addFileChildren(
+  AiProjectsRouteChildren,
+)
+
+interface AiTasksRouteChildren {
+  AiTasksTaskIdRoute: typeof AiTasksTaskIdRoute
+}
+
+const AiTasksRouteChildren: AiTasksRouteChildren = {
+  AiTasksTaskIdRoute: AiTasksTaskIdRoute,
+}
+
+const AiTasksRouteWithChildren =
+  AiTasksRoute._addFileChildren(AiTasksRouteChildren)
+
+interface AiRouteChildren {
+  AiActivityRoute: typeof AiActivityRoute
+  AiAgentsRoute: typeof AiAgentsRouteWithChildren
+  AiApprovalsRoute: typeof AiApprovalsRouteWithChildren
+  AiCostsRoute: typeof AiCostsRoute
+  AiGoalsRoute: typeof AiGoalsRouteWithChildren
+  AiInboxRoute: typeof AiInboxRoute
+  AiOrgRoute: typeof AiOrgRoute
+  AiProjectsRoute: typeof AiProjectsRouteWithChildren
+  AiSettingsRoute: typeof AiSettingsRoute
+  AiTasksRoute: typeof AiTasksRouteWithChildren
+  AiIndexRoute: typeof AiIndexRoute
+}
+
+const AiRouteChildren: AiRouteChildren = {
+  AiActivityRoute: AiActivityRoute,
+  AiAgentsRoute: AiAgentsRouteWithChildren,
+  AiApprovalsRoute: AiApprovalsRouteWithChildren,
+  AiCostsRoute: AiCostsRoute,
+  AiGoalsRoute: AiGoalsRouteWithChildren,
+  AiInboxRoute: AiInboxRoute,
+  AiOrgRoute: AiOrgRoute,
+  AiProjectsRoute: AiProjectsRouteWithChildren,
+  AiSettingsRoute: AiSettingsRoute,
+  AiTasksRoute: AiTasksRouteWithChildren,
+  AiIndexRoute: AiIndexRoute,
+}
+
+const AiRouteWithChildren = AiRoute._addFileChildren(AiRouteChildren)
 
 interface MeetingsRouteChildren {
   MeetingsActivityRoute: typeof MeetingsActivityRoute
@@ -419,6 +829,7 @@ const UHandleRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiRoute: AiRouteWithChildren,
   ChatRoute: ChatRoute,
   LoginRoute: LoginRoute,
   MeetingsRoute: MeetingsRouteWithChildren,

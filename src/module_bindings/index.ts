@@ -35,10 +35,17 @@ import {
 
 // Import all reducer arg schemas
 import AddChannelMemberReducer from "./add_channel_member_reducer";
+import AppendAiRunEventReducer from "./append_ai_run_event_reducer";
 import ApproveMeetingBookingReducer from "./approve_meeting_booking_reducer";
 import CancelMeetingBookingReducer from "./cancel_meeting_booking_reducer";
 import CancelMeetingBookingByTokenReducer from "./cancel_meeting_booking_by_token_reducer";
 import CancelScheduledMeetingReducer from "./cancel_scheduled_meeting_reducer";
+import CreateAiAgentReducer from "./create_ai_agent_reducer";
+import CreateAiApprovalReducer from "./create_ai_approval_reducer";
+import CreateAiGoalReducer from "./create_ai_goal_reducer";
+import CreateAiProjectReducer from "./create_ai_project_reducer";
+import CreateAiRunReducer from "./create_ai_run_reducer";
+import CreateAiTaskReducer from "./create_ai_task_reducer";
 import CreateChannelReducer from "./create_channel_reducer";
 import CreateInviteReducer from "./create_invite_reducer";
 import CreateMeetingBookingReducer from "./create_meeting_booking_reducer";
@@ -46,22 +53,28 @@ import CreateMeetingEventTypeReducer from "./create_meeting_event_type_reducer";
 import CreateMeetingFollowupTemplateReducer from "./create_meeting_followup_template_reducer";
 import CreateOrganizationReducer from "./create_organization_reducer";
 import CreateScheduledMeetingReducer from "./create_scheduled_meeting_reducer";
+import DecideAiApprovalReducer from "./decide_ai_approval_reducer";
 import EditMessageReducer from "./edit_message_reducer";
 import EndChannelCallReducer from "./end_channel_call_reducer";
+import EnqueueAiWakeupRequestReducer from "./enqueue_ai_wakeup_request_reducer";
 import GenerateJoinIdReducer from "./generate_join_id_reducer";
 import HeartbeatReducer from "./heartbeat_reducer";
 import JoinChannelCallReducer from "./join_channel_call_reducer";
 import JoinOrganizationReducer from "./join_organization_reducer";
 import JoinScheduledMeetingReducer from "./join_scheduled_meeting_reducer";
 import LeaveChannelCallReducer from "./leave_channel_call_reducer";
+import LogAiActivityReducer from "./log_ai_activity_reducer";
 import MarkChannelReadReducer from "./mark_channel_read_reducer";
 import MarkMeetingReminderDeliveryStatusReducer from "./mark_meeting_reminder_delivery_status_reducer";
 import QueueMeetingReminderDeliveriesReducer from "./queue_meeting_reminder_deliveries_reducer";
+import RecordAiAgentRuntimeHeartbeatReducer from "./record_ai_agent_runtime_heartbeat_reducer";
 import RegisterUserReducer from "./register_user_reducer";
 import RejectMeetingBookingReducer from "./reject_meeting_booking_reducer";
 import RescheduleMeetingBookingReducer from "./reschedule_meeting_booking_reducer";
 import RescheduleMeetingBookingByTokenReducer from "./reschedule_meeting_booking_by_token_reducer";
 import RescheduleScheduledMeetingReducer from "./reschedule_scheduled_meeting_reducer";
+import RestoreAiAgentRuntimeRevisionReducer from "./restore_ai_agent_runtime_revision_reducer";
+import RestoreAiWorkspaceSettingsRevisionReducer from "./restore_ai_workspace_settings_revision_reducer";
 import SendMessageReducer from "./send_message_reducer";
 import SetMeetingAvailabilityRulesReducer from "./set_meeting_availability_rules_reducer";
 import SetMeetingRecordingPolicyReducer from "./set_meeting_recording_policy_reducer";
@@ -69,14 +82,36 @@ import SetMeetingReminderTemplateReducer from "./set_meeting_reminder_template_r
 import SetTypingReducer from "./set_typing_reducer";
 import StartChannelCallReducer from "./start_channel_call_reducer";
 import ToggleReactionReducer from "./toggle_reaction_reducer";
+import UpdateAiAgentStatusReducer from "./update_ai_agent_status_reducer";
+import UpdateAiGoalProgressReducer from "./update_ai_goal_progress_reducer";
+import UpdateAiProjectStatusReducer from "./update_ai_project_status_reducer";
+import UpdateAiRunStatusReducer from "./update_ai_run_status_reducer";
+import UpdateAiTaskStatusReducer from "./update_ai_task_status_reducer";
+import UpdateAiWakeupRequestStatusReducer from "./update_ai_wakeup_request_status_reducer";
 import UpdateMeetingEventTypeReducer from "./update_meeting_event_type_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
 import UpdateScheduledMeetingReducer from "./update_scheduled_meeting_reducer";
+import UpsertAiAdapterSessionReducer from "./upsert_ai_adapter_session_reducer";
+import UpsertAiAgentRuntimeReducer from "./upsert_ai_agent_runtime_reducer";
+import UpsertAiWorkspaceSettingsReducer from "./upsert_ai_workspace_settings_reducer";
 import UpsertMeetingPublicProfileReducer from "./upsert_meeting_public_profile_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import AiActivityRow from "./ai_activity_table";
+import AiAdapterSessionRow from "./ai_adapter_session_table";
+import AiAgentRow from "./ai_agent_table";
+import AiAgentRuntimeRow from "./ai_agent_runtime_table";
+import AiApprovalRow from "./ai_approval_table";
+import AiConfigRevisionRow from "./ai_config_revision_table";
+import AiGoalRow from "./ai_goal_table";
+import AiProjectRow from "./ai_project_table";
+import AiRunRow from "./ai_run_table";
+import AiRunEventRow from "./ai_run_event_table";
+import AiTaskRow from "./ai_task_table";
+import AiWakeupRequestRow from "./ai_wakeup_request_table";
+import AiWorkspaceSettingsRow from "./ai_workspace_settings_table";
 import ChatCallParticipantRow from "./chat_call_participant_table";
 import ChatCallSessionRow from "./chat_call_session_table";
 import ChatChannelRow from "./chat_channel_table";
@@ -106,6 +141,389 @@ import UserPresenceRow from "./user_presence_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  ai_activity: __table({
+    name: 'ai_activity',
+    indexes: [
+      { name: 'actor_user_id', algorithm: 'btree', columns: [
+        'actorUserId',
+      ] },
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'approval_id', algorithm: 'btree', columns: [
+        'approvalId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'event_type', algorithm: 'btree', columns: [
+        'eventType',
+      ] },
+      { name: 'goal_id', algorithm: 'btree', columns: [
+        'goalId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'project_id', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'run_id', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_activity_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiActivityRow),
+  ai_adapter_session: __table({
+    name: 'ai_adapter_session',
+    indexes: [
+      { name: 'adapter_type', algorithm: 'btree', columns: [
+        'adapterType',
+      ] },
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'external_session_id', algorithm: 'btree', columns: [
+        'externalSessionId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'last_seen_at', algorithm: 'btree', columns: [
+        'lastSeenAt',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'run_id', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_adapter_session_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiAdapterSessionRow),
+  ai_agent: __table({
+    name: 'ai_agent',
+    indexes: [
+      { name: 'department', algorithm: 'btree', columns: [
+        'department',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'manager_user_id', algorithm: 'btree', columns: [
+        'managerUserId',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'owner_user_id', algorithm: 'btree', columns: [
+        'ownerUserId',
+      ] },
+      { name: 'project_id', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_agent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiAgentRow),
+  ai_agent_runtime: __table({
+    name: 'ai_agent_runtime',
+    indexes: [
+      { name: 'adapter_type', algorithm: 'btree', columns: [
+        'adapterType',
+      ] },
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'last_failure_at', algorithm: 'btree', columns: [
+        'lastFailureAt',
+      ] },
+      { name: 'last_heartbeat_at', algorithm: 'btree', columns: [
+        'lastHeartbeatAt',
+      ] },
+      { name: 'last_success_at', algorithm: 'btree', columns: [
+        'lastSuccessAt',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'runtime_status', algorithm: 'btree', columns: [
+        'runtimeStatus',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_agent_runtime_agent_id_key', constraint: 'unique', columns: ['agentId'] },
+    ],
+  }, AiAgentRuntimeRow),
+  ai_approval: __table({
+    name: 'ai_approval',
+    indexes: [
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'requester_user_id', algorithm: 'btree', columns: [
+        'requesterUserId',
+      ] },
+      { name: 'reviewer_user_id', algorithm: 'btree', columns: [
+        'reviewerUserId',
+      ] },
+      { name: 'risk_level', algorithm: 'btree', columns: [
+        'riskLevel',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_approval_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiApprovalRow),
+  ai_config_revision: __table({
+    name: 'ai_config_revision',
+    indexes: [
+      { name: 'actor_user_id', algorithm: 'btree', columns: [
+        'actorUserId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'scope_id', algorithm: 'btree', columns: [
+        'scopeId',
+      ] },
+      { name: 'scope_type', algorithm: 'btree', columns: [
+        'scopeType',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_config_revision_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiConfigRevisionRow),
+  ai_goal: __table({
+    name: 'ai_goal',
+    indexes: [
+      { name: 'due_at', algorithm: 'btree', columns: [
+        'dueAt',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'owner_user_id', algorithm: 'btree', columns: [
+        'ownerUserId',
+      ] },
+      { name: 'project_id', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_goal_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiGoalRow),
+  ai_project: __table({
+    name: 'ai_project',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'owner_user_id', algorithm: 'btree', columns: [
+        'ownerUserId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_project_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiProjectRow),
+  ai_run: __table({
+    name: 'ai_run',
+    indexes: [
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiRunRow),
+  ai_run_event: __table({
+    name: 'ai_run_event',
+    indexes: [
+      { name: 'actor_user_id', algorithm: 'btree', columns: [
+        'actorUserId',
+      ] },
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'event_type', algorithm: 'btree', columns: [
+        'eventType',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'level', algorithm: 'btree', columns: [
+        'level',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'run_id', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_run_event_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiRunEventRow),
+  ai_task: __table({
+    name: 'ai_task',
+    indexes: [
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'due_at', algorithm: 'btree', columns: [
+        'dueAt',
+      ] },
+      { name: 'goal_id', algorithm: 'btree', columns: [
+        'goalId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'linked_entity_id', algorithm: 'btree', columns: [
+        'linkedEntityId',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'priority', algorithm: 'btree', columns: [
+        'priority',
+      ] },
+      { name: 'project_id', algorithm: 'btree', columns: [
+        'projectId',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_task_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiTaskRow),
+  ai_wakeup_request: __table({
+    name: 'ai_wakeup_request',
+    indexes: [
+      { name: 'agent_id', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { name: 'created_at', algorithm: 'btree', columns: [
+        'createdAt',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+      { name: 'requested_by_user_id', algorithm: 'btree', columns: [
+        'requestedByUserId',
+      ] },
+      { name: 'run_id', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+      { name: 'source', algorithm: 'btree', columns: [
+        'source',
+      ] },
+      { name: 'status', algorithm: 'btree', columns: [
+        'status',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_wakeup_request_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiWakeupRequestRow),
+  ai_workspace_settings: __table({
+    name: 'ai_workspace_settings',
+    indexes: [
+      { name: 'created_by_user_id', algorithm: 'btree', columns: [
+        'createdByUserId',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_workspace_settings_org_id_key', constraint: 'unique', columns: ['orgId'] },
+    ],
+  }, AiWorkspaceSettingsRow),
   chat_call_participant: __table({
     name: 'chat_call_participant',
     indexes: [
@@ -602,10 +1020,17 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_channel_member", AddChannelMemberReducer),
+  __reducerSchema("append_ai_run_event", AppendAiRunEventReducer),
   __reducerSchema("approve_meeting_booking", ApproveMeetingBookingReducer),
   __reducerSchema("cancel_meeting_booking", CancelMeetingBookingReducer),
   __reducerSchema("cancel_meeting_booking_by_token", CancelMeetingBookingByTokenReducer),
   __reducerSchema("cancel_scheduled_meeting", CancelScheduledMeetingReducer),
+  __reducerSchema("create_ai_agent", CreateAiAgentReducer),
+  __reducerSchema("create_ai_approval", CreateAiApprovalReducer),
+  __reducerSchema("create_ai_goal", CreateAiGoalReducer),
+  __reducerSchema("create_ai_project", CreateAiProjectReducer),
+  __reducerSchema("create_ai_run", CreateAiRunReducer),
+  __reducerSchema("create_ai_task", CreateAiTaskReducer),
   __reducerSchema("create_channel", CreateChannelReducer),
   __reducerSchema("create_invite", CreateInviteReducer),
   __reducerSchema("create_meeting_booking", CreateMeetingBookingReducer),
@@ -613,22 +1038,28 @@ const reducersSchema = __reducers(
   __reducerSchema("create_meeting_followup_template", CreateMeetingFollowupTemplateReducer),
   __reducerSchema("create_organization", CreateOrganizationReducer),
   __reducerSchema("create_scheduled_meeting", CreateScheduledMeetingReducer),
+  __reducerSchema("decide_ai_approval", DecideAiApprovalReducer),
   __reducerSchema("edit_message", EditMessageReducer),
   __reducerSchema("end_channel_call", EndChannelCallReducer),
+  __reducerSchema("enqueue_ai_wakeup_request", EnqueueAiWakeupRequestReducer),
   __reducerSchema("generate_join_id", GenerateJoinIdReducer),
   __reducerSchema("heartbeat", HeartbeatReducer),
   __reducerSchema("join_channel_call", JoinChannelCallReducer),
   __reducerSchema("join_organization", JoinOrganizationReducer),
   __reducerSchema("join_scheduled_meeting", JoinScheduledMeetingReducer),
   __reducerSchema("leave_channel_call", LeaveChannelCallReducer),
+  __reducerSchema("log_ai_activity", LogAiActivityReducer),
   __reducerSchema("mark_channel_read", MarkChannelReadReducer),
   __reducerSchema("mark_meeting_reminder_delivery_status", MarkMeetingReminderDeliveryStatusReducer),
   __reducerSchema("queue_meeting_reminder_deliveries", QueueMeetingReminderDeliveriesReducer),
+  __reducerSchema("record_ai_agent_runtime_heartbeat", RecordAiAgentRuntimeHeartbeatReducer),
   __reducerSchema("register_user", RegisterUserReducer),
   __reducerSchema("reject_meeting_booking", RejectMeetingBookingReducer),
   __reducerSchema("reschedule_meeting_booking", RescheduleMeetingBookingReducer),
   __reducerSchema("reschedule_meeting_booking_by_token", RescheduleMeetingBookingByTokenReducer),
   __reducerSchema("reschedule_scheduled_meeting", RescheduleScheduledMeetingReducer),
+  __reducerSchema("restore_ai_agent_runtime_revision", RestoreAiAgentRuntimeRevisionReducer),
+  __reducerSchema("restore_ai_workspace_settings_revision", RestoreAiWorkspaceSettingsRevisionReducer),
   __reducerSchema("send_message", SendMessageReducer),
   __reducerSchema("set_meeting_availability_rules", SetMeetingAvailabilityRulesReducer),
   __reducerSchema("set_meeting_recording_policy", SetMeetingRecordingPolicyReducer),
@@ -636,9 +1067,18 @@ const reducersSchema = __reducers(
   __reducerSchema("set_typing", SetTypingReducer),
   __reducerSchema("start_channel_call", StartChannelCallReducer),
   __reducerSchema("toggle_reaction", ToggleReactionReducer),
+  __reducerSchema("update_ai_agent_status", UpdateAiAgentStatusReducer),
+  __reducerSchema("update_ai_goal_progress", UpdateAiGoalProgressReducer),
+  __reducerSchema("update_ai_project_status", UpdateAiProjectStatusReducer),
+  __reducerSchema("update_ai_run_status", UpdateAiRunStatusReducer),
+  __reducerSchema("update_ai_task_status", UpdateAiTaskStatusReducer),
+  __reducerSchema("update_ai_wakeup_request_status", UpdateAiWakeupRequestStatusReducer),
   __reducerSchema("update_meeting_event_type", UpdateMeetingEventTypeReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
   __reducerSchema("update_scheduled_meeting", UpdateScheduledMeetingReducer),
+  __reducerSchema("upsert_ai_adapter_session", UpsertAiAdapterSessionReducer),
+  __reducerSchema("upsert_ai_agent_runtime", UpsertAiAgentRuntimeReducer),
+  __reducerSchema("upsert_ai_workspace_settings", UpsertAiWorkspaceSettingsReducer),
   __reducerSchema("upsert_meeting_public_profile", UpsertMeetingPublicProfileReducer),
 );
 

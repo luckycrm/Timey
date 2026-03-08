@@ -37,6 +37,21 @@ Timey is built to become a full operating layer for:
 Current release focuses on identity, workspace setup, members, invites, chat, and real-time foundations.  
 Project/task planning and deeper time tracking can be added on top of the existing schema and reducer model.
 
+## Current Page Map
+
+- `/chat` team chat, threads, reactions, presence, and call entry
+- `/meetings` meeting home and scheduling surface
+- `/meetings/calendar` full calendar management view
+- `/meetings/requests` host booking review and follow-up operations
+- `/meetings/activity` meeting activity and follow-up queue
+- `/meetings/settings` guided booking setup
+- `/u/:handle` public booking directory
+- `/u/:handle/:eventTypeSlug` public booking flow
+- `/booking/:token` guest join/manage page
+- `/meet/:inviteToken` external guest meeting join page
+- `/ai` AI workforce home
+- `/ai/agents`, `/ai/tasks`, `/ai/approvals`, `/ai/inbox`, `/ai/activity`, `/ai/projects`, `/ai/goals`, `/ai/costs`, `/ai/org`, `/ai/settings`
+
 ## Tech Stack
 
 - Frontend: React 19 + TanStack Start + TanStack Router + React Query
@@ -130,7 +145,7 @@ spacetimedb/
 - [ ] Time entries, attendance, and reporting
 - [ ] Role-based permissions and audit trails
 
-## Implementation Status (March 7, 2026)
+## Implementation Status (March 8, 2026)
 
 ### Done
 
@@ -168,6 +183,21 @@ spacetimedb/
 - Direct reminder emails can also be sent from `/meetings/requests` for approved bookings.
 - Post-meeting follow-up nudges are available from `/meetings/activity` for ended bookings.
 - Global radius tokens are added and main chat/dashboard/meetings/public-booking surfaces are standardized to the same corner system.
+- AI workforce routes are live under `/ai` with native Timey navigation for agents, tasks, approvals, inbox, activity, projects, goals, costs, org, and settings.
+- AI home, inbox, activity, agents, and tasks are wired to live SpacetimeDB records instead of static placeholder cards.
+- AI runtime control-plane tables are added: `ai_agent_runtime`, `ai_wakeup_request`, `ai_run_event`, and `ai_adapter_session`.
+- Agent detail pages now expose runtime configuration, wakeup queueing, adapter sessions, run history, and run-event timelines backed by live reducers.
+- Task detail pages now expose wakeup queueing, operator run notes, adapter-session visibility, and detailed run-event timelines.
+- AI home is now a Paperclip-style operator cockpit with action queues, active agents, queue mix, spend trend, project snapshot, and recent control-plane activity.
+- AI config revision history is now live for agent runtime and workspace settings, with restore actions directly on `/ai/agents/:id` and `/ai/settings`.
+- Task detail now includes a dedicated live execution widget that consolidates the active run, latest wakeup, adapter session, spend guardrail, and current execution signals into one operator surface.
+- AI projects now use portfolio lanes and richer project detail pages with staffing, goals, task queue, recent runs, and operator notes.
+- AI goals now use an outcome board with grouped work and richer goal detail pages focused on delivery signals.
+- AI org now supports both coverage and manager views for the AI workforce.
+- AI costs now includes date presets, budget pressure, spend trends, agent spend ranking, and project cost rollups.
+- AI settings now use a readable control-plane configuration surface with restoreable revision history.
+- AI task detail now has a live run widget for current run state, recent runtime events, queue health, and adapter session state.
+- AI runtime and workspace settings now write restoreable config revisions via `ai_config_revision`, with restore actions available in agent detail and AI settings.
 
 ### To Do
 
@@ -179,7 +209,12 @@ spacetimedb/
 - External calendar sync (Google/Microsoft).
 - Enterprise reporting and compliance automation for meeting lifecycle.
 - End-to-end automated tests for public booking, guest join, and host request flows.
+- AI runtime execution worker / heartbeat loop so queued wakeups turn into real runs automatically.
+- Richer run-log streaming, config diff views, and task/agent-level restore previews to push the AI control plane closer to Paperclip.
+- AI table privacy hardening and export/reporting for multi-tenant production use.
+- Native Timey agent tools (research, proposals, outbound, decks) and optional external runtime adapters.
 - See the detailed meetings plan in [docs/meetings-roadmap.md](./docs/meetings-roadmap.md).
+- See the AI migration plan in [docs/ai-workforce-migration-plan.md](./docs/ai-workforce-migration-plan.md).
 
 ## Contributors
 
