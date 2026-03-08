@@ -130,7 +130,7 @@ spacetimedb/
 - [ ] Time entries, attendance, and reporting
 - [ ] Role-based permissions and audit trails
 
-## Implementation Status (March 6, 2026)
+## Implementation Status (March 7, 2026)
 
 ### Done
 
@@ -149,18 +149,25 @@ spacetimedb/
 - Dyte server bridge is added (`src/server/dyte.ts`) to create meetings and participant auth tokens securely.
 - Call sessions are now chat-native via SpacetimeDB (`chat_call_session`, `chat_call_participant`) with active call discovery, join, leave, and end flows.
 - Meetings manager is live at `/meetings` with channel/public meeting scheduling and join-window enforcement.
-- Full-screen calendar view is live at `/meetings/calendar` with month/week/day/agenda modes.
-- Calendar supports drag-and-drop day-level meeting rescheduling and ICS export (per-meeting and visible-view export).
-- Meeting settings are live at `/meetings/settings` (public booking profile, event types, availability rules, recording policy, follow-up templates, reminder templates, booking activity feed).
-- Meetings manager, calendar, and settings now share a standard meetings UI shell and sidebar navigation, including quick links to chat and the user public booking page.
+- Meetings manager is simplified around actual operations instead of placeholder panels.
+- Full-screen calendar view is redesigned as the primary calendar surface, with date popup workflows, in-place meeting creation/editing, conflict surfacing, drag rescheduling, and ICS export.
+- Meeting settings are redesigned into a guided setup flow for office users (booking page, booking types, weekly availability, reminders/follow-up).
+- Booking requests are moved to `/meetings/requests` as a dedicated host workflow page.
+- Meeting activity and follow-up are moved to `/meetings/activity` as a separate operational page.
+- Meetings manager, calendar, requests, activity, and settings now share a standard meetings UI shell and a consistent submenu/sidebar.
 - Public booking pages are available at `/u/:handle` and `/u/:handle/:eventTypeSlug`.
-- Booking approval workflow is live for event types with `requireApproval` (pending queue + approve/decline in meetings settings).
+- Public booking event pages are redesigned into a cleaner booking flow with calendar-first scheduling and separate details confirmation.
+- Booking approval workflow is live for event types with `requireApproval` (pending queue + approve/decline in `/meetings/requests`).
 - Public booking flow now suggests nearby alternative slots when conflict/availability errors occur.
-- Booking management links are live at `/booking/:token` (self-serve reschedule/cancel) and host controls are in meetings settings.
+- Booking management links are live at `/booking/:token`, redesigned as a guest-facing page with join-first flow plus manage controls.
+- Public scheduled meetings now support true external guest invite links via `/meet/:inviteToken` instead of pointing outsiders into the workspace portal.
+- Host booking operations are now available on `/meetings/requests`, including approve/decline, start/join meeting, reminder email, reschedule, cancel, and guest manage-link actions.
 - Meeting lifecycle emails are sent via ZeptoMail for booking request/confirm/decline/reschedule/cancel and scheduled-meeting notices.
 - Confirmed/rescheduled notices include `.ics` calendar invite attachments.
 - Reminder templates can queue reminder deliveries in `/meetings/settings`, with due-now bulk dispatch, manual single-send, and failure tracking.
-- Post-meeting follow-up nudges are available from meetings settings for ended bookings.
+- Direct reminder emails can also be sent from `/meetings/requests` for approved bookings.
+- Post-meeting follow-up nudges are available from `/meetings/activity` for ended bookings.
+- Global radius tokens are added and main chat/dashboard/meetings/public-booking surfaces are standardized to the same corner system.
 
 ### To Do
 
@@ -168,8 +175,10 @@ spacetimedb/
 - Notification preferences UI (sound on/off, desktop notification toggle, channel-level controls).
 - Additional mobile refinements for floating messenger behavior.
 - More chat QA coverage for reconnect/offline/online transitions and multi-account switching.
+- Reminder automation worker so reminders send without opening settings.
 - External calendar sync (Google/Microsoft).
 - Enterprise reporting and compliance automation for meeting lifecycle.
+- End-to-end automated tests for public booking, guest join, and host request flows.
 - See the detailed meetings plan in [docs/meetings-roadmap.md](./docs/meetings-roadmap.md).
 
 ## Contributors
