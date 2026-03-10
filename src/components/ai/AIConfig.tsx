@@ -10,6 +10,8 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PrecisionManufacturingOutlinedIcon from '@mui/icons-material/PrecisionManufacturingOutlined';
 
 export type AIPageKey =
     | 'home'
@@ -22,7 +24,9 @@ export type AIPageKey =
     | 'goals'
     | 'costs'
     | 'org'
-    | 'settings';
+    | 'settings'
+    | 'secrets'
+    | 'llms';
 
 export interface AIPageDefinition {
     key: AIPageKey;
@@ -109,6 +113,20 @@ export const aiPageDefinitions: AIPageDefinition[] = [
         eyebrow: 'Policies',
         description: 'Defaults, limits, integrations, and audit controls.',
         icon: TuneOutlinedIcon,
+    },
+    {
+        key: 'secrets',
+        label: 'Secrets',
+        eyebrow: 'Security',
+        description: 'Encrypted API keys and tokens for agent use at runtime.',
+        icon: LockOutlinedIcon,
+    },
+    {
+        key: 'llms',
+        label: 'LLM Providers',
+        eyebrow: 'Models',
+        description: 'Configure language model providers available to agents.',
+        icon: PrecisionManufacturingOutlinedIcon,
     },
 ];
 

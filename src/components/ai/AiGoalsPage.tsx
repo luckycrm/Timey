@@ -1,25 +1,49 @@
 import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
 import { useReducer } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AIProgressRow, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
-import { NONE_U64 } from './aiUtils';
+import { AIWorkspacePage } from './AIPrimitives';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 const goalStatuses = ['on_track', 'watching', 'blocked', 'completed'] as const;
+type GoalStatus = (typeof goalStatuses)[number];
 
-const statusConfig: Record<(typeof goalStatuses)[number], { title: string; tone: 'neutral' | 'info' | 'success' | 'warning' | 'danger' }> = {
-    on_track: { title: 'On track', tone: 'success' },
-    watching: { title: 'Watching', tone: 'warning' },
-    blocked: { title: 'Blocked', tone: 'danger' },
-    completed: { title: 'Completed', tone: 'info' },
+const statusLabel: Record<GoalStatus, string> = {
+    on_track: 'On track',
+    watching: 'Watching',
+    blocked: 'Blocked',
+    completed: 'Completed',
 };
+
+const statusColor: Record<GoalStatus, string> = {
+    on_track: '#38c872',
+    watching: '#ff9800',
+    blocked: '#e33d4f',
+    completed: '#7eb0ff',
+};
+
+type GoalTab = 'all' | 'on_track' | 'watching' | 'blocked' | 'completed';
+
+const TABS: { value: GoalTab; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'on_track', label: 'On track' },
+    { value: 'watching', label: 'Watching' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'completed', label: 'Completed' },
+];
 
 export function AIGoalsPage() {
     const {
@@ -41,11 +65,8 @@ export function AIGoalsPage() {
         progressPct: '25',
         dueAt: '',
     });
-
-    const onTrackGoals = aiGoals.filter((goal) => goal.status === 'on_track');
-    const watchingGoals = aiGoals.filter((goal) => goal.status === 'watching');
-    const blockedGoals = aiGoals.filter((goal) => goal.status === 'blocked');
-    const completedGoals = aiGoals.filter((goal) => goal.status === 'completed');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [tab, setTab] = useState<GoalTab>('all');
 
     const goalRows = useMemo(
         () => [...aiGoals]
@@ -65,30 +86,15 @@ export function AIGoalsPage() {
         [aiGoals, aiProjects, aiTasks, usersById]
     );
 
-    const board = useMemo(
-        () => goalStatuses.map((status) => ({
-            status,
-            label: statusConfig[status].title,
-            tone: statusConfig[status].tone,
-            rows: goalRows.filter((row) => row.goal.status === status),
-        })),
-        [goalRows]
-    );
+    const filtered = useMemo(() => {
+        if (tab === 'all') return goalRows;
+        return goalRows.filter((r) => r.goal.status === tab);
+    }, [goalRows, tab]);
 
-    const groupedByProject = useMemo(
-        () => {
-            const withProject = aiProjects
-                .map((project) => ({
-                    project,
-                    goals: goalRows.filter((row) => row.project?.id === project.id),
-                }))
-                .filter((entry) => entry.goals.length > 0);
-
-            const unlinked = goalRows.filter((row) => row.project == null || row.goal.projectId === NONE_U64);
-            return { withProject, unlinked };
-        },
-        [aiProjects, goalRows]
-    );
+    const tabCount = (t: GoalTab) => {
+        if (t === 'all') return aiGoals.length;
+        return aiGoals.filter((g) => g.status === t).length;
+    };
 
     const handleCreateGoal = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -103,15 +109,9 @@ export function AIGoalsPage() {
                 progressPct: BigInt(Math.max(0, Math.min(100, Number(form.progressPct || '0')))),
                 dueAt: form.dueAt ? BigInt(new Date(form.dueAt).getTime()) : 0n,
             });
-            setForm({
-                title: '',
-                description: '',
-                projectId: form.projectId,
-                status: 'watching',
-                progressPct: '25',
-                dueAt: '',
-            });
+            setForm({ title: '', description: '', projectId: form.projectId, status: 'watching', progressPct: '25', dueAt: '' });
             toast.success('Goal created');
+            setCreateOpen(false);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to create goal');
         }
@@ -119,129 +119,214 @@ export function AIGoalsPage() {
 
     return (
         <AIWorkspacePage page="goals">
-            <AIPageIntro
-                eyebrow="Goals"
-                title="Tie AI work to outcomes"
-                description="Goals are live outcome records. Use this page to see whether work is on track, drifting, blocked, or already closed."
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Goals
+                </Typography>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+                    onClick={() => setCreateOpen(true)}
+                    sx={{
+                        textTransform: 'none',
+                        fontSize: '0.8rem',
+                        borderColor: '#1a1a1a',
+                        color: '#858585',
+                        '&:hover': { borderColor: '#333', color: '#fff', bgcolor: 'transparent' },
+                    }}
+                >
+                    New Goal
+                </Button>
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Goals on track" value={String(onTrackGoals.length)} caption={`${aiGoals.length} total goals`} tone="success" />
-                <AIStatCard label="Watching" value={String(watchingGoals.length)} caption="Needs more momentum" tone="warning" />
-                <AIStatCard label="Blocked" value={String(blockedGoals.length)} caption="Requires intervention" tone="danger" />
-                <AIStatCard label="Completed" value={String(completedGoals.length)} caption="Closed out outcomes" tone="info" />
-            </AIStatGrid>
+            {/* Tabs */}
+            <Stack direction="row" spacing={0} sx={{ borderBottom: '1px solid #1a1a1a', mt: -0.5 }}>
+                {TABS.map((t) => (
+                    <button
+                        key={t.value}
+                        onClick={() => setTab(t.value)}
+                        style={{
+                            padding: '6px 14px',
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: tab === t.value ? '#ffffff' : '#555',
+                            borderBottom: tab === t.value ? '2px solid #ffffff' : '2px solid transparent',
+                            fontSize: '0.8rem',
+                            fontWeight: tab === t.value ? 600 : 400,
+                            transition: 'color 0.15s',
+                        }}
+                    >
+                        {t.label}
+                        {tabCount(t.value) > 0 && (
+                            <span style={{ marginLeft: 5, fontSize: '0.7rem', color: tab === t.value ? '#858585' : '#444' }}>
+                                {tabCount(t.value)}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </Stack>
 
-            <AISectionGrid>
-                <AISectionCard eyebrow="Board" title="Outcome board" description="Grouped by goal status so blocked and drifting outcomes surface immediately.">
-                    <Stack spacing={1.4}>
-                        {board.map((group) => (
-                            <Stack key={group.status} spacing={1}>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                            {group.label}
-                                        </Typography>
-                                        <AIStatusPill label={`${group.rows.length}`} tone={group.tone} />
-                                    </Stack>
-                                    <Typography variant="caption" sx={{ color: '#666666' }}>
-                                        {group.rows.length === 0 ? 'No goals here' : `${group.rows.length} goal${group.rows.length === 1 ? '' : 's'}`}
+            {/* Count */}
+            {filtered.length > 0 && (
+                <Typography variant="caption" sx={{ color: '#555' }}>
+                    {filtered.length} goal{filtered.length !== 1 ? 's' : ''}
+                </Typography>
+            )}
+
+            {/* Goal list */}
+            {aiGoals.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#555' }}>No goals yet.</Typography>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{ mt: 2, textTransform: 'none', borderColor: '#1a1a1a', color: '#858585', '&:hover': { borderColor: '#333', color: '#fff', bgcolor: 'transparent' } }}
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        Create your first goal
+                    </Button>
+                </Box>
+            ) : filtered.length === 0 ? (
+                <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                    <Box sx={{ py: 6, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#555' }}>No goals match this filter.</Typography>
+                    </Box>
+                </Box>
+            ) : (
+                <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                    {filtered.map(({ goal, owner, project, linkedTasks, blockedTasks }) => {
+                        const progressPct = Number(goal.progressPct);
+                        const color = statusColor[goal.status as GoalStatus] ?? '#555';
+                        return (
+                            <Stack
+                                key={goal.id.toString()}
+                                direction="row"
+                                alignItems="center"
+                                spacing={2}
+                                sx={{
+                                    px: 2,
+                                    py: 1.5,
+                                    borderBottom: '1px solid #1a1a1a',
+                                    '&:last-child': { borderBottom: 'none' },
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                }}
+                            >
+                                {/* Status dot */}
+                                <Box
+                                    sx={{
+                                        width: 7,
+                                        height: 7,
+                                        borderRadius: '50%',
+                                        bgcolor: color,
+                                        flexShrink: 0,
+                                    }}
+                                />
+
+                                {/* Name + meta + progress */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
+                                        {goal.title}
                                     </Typography>
+                                    <Typography variant="caption" sx={{ color: '#555' }}>
+                                        {project?.name || 'No project'}
+                                        {owner ? ` • ${owner.name || owner.email}` : ''}
+                                        {' • '}
+                                        {linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}
+                                        {blockedTasks > 0 ? ` • ${blockedTasks} blocked` : ''}
+                                    </Typography>
+                                    <Box sx={{ mt: 0.75, maxWidth: 240 }}>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={progressPct}
+                                            sx={{
+                                                height: 3,
+                                                borderRadius: 999,
+                                                bgcolor: 'rgba(255,255,255,0.06)',
+                                                '& .MuiLinearProgress-bar': {
+                                                    borderRadius: 999,
+                                                    bgcolor: blockedTasks > 0 ? '#ff9800' : '#38c872',
+                                                },
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+
+                                {/* Right */}
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                                    <Typography variant="caption" sx={{ color: '#555', minWidth: 32, textAlign: 'right' }}>
+                                        {progressPct}%
+                                    </Typography>
+                                    <Chip
+                                        size="small"
+                                        label={statusLabel[goal.status as GoalStatus] ?? goal.status}
+                                        sx={{
+                                            fontSize: '0.7rem',
+                                            height: 20,
+                                            bgcolor: 'transparent',
+                                            color,
+                                            border: '1px solid #1a1a1a',
+                                            borderRadius: '4px',
+                                        }}
+                                    />
+                                    {goal.status !== 'completed' && (
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                            onClick={() =>
+                                                updateAiGoalProgress({
+                                                    goalId: goal.id,
+                                                    progressPct: BigInt(Math.min(100, progressPct + 10)),
+                                                    status: progressPct + 10 >= 100 ? 'completed' : goal.status,
+                                                }).catch((error) => {
+                                                    toast.error(error instanceof Error ? error.message : 'Failed to update goal');
+                                                })
+                                            }
+                                        >
+                                            +10%
+                                        </Button>
+                                    )}
+                                    <Button
+                                        component="a"
+                                        href={`/ai/goals/${goal.id.toString()}`}
+                                        size="small"
+                                        variant="text"
+                                        sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1, '&:hover': { color: '#fff' } }}
+                                    >
+                                        Details →
+                                    </Button>
                                 </Stack>
-                                {group.rows.length === 0 ? (
-                                    <Typography variant="body2" sx={{ color: '#666666', lineHeight: 1.7 }}>
-                                        Nothing is currently marked {group.label.toLowerCase()}.
-                                    </Typography>
-                                ) : (
-                                    <Stack direction={{ xs: 'column', xl: 'row' }} spacing={1.2} useFlexGap flexWrap="wrap">
-                                        {group.rows.map(({ goal, owner, project, runningTasks, blockedTasks, waitingTasks, linkedTasks }) => (
-                                            <Stack
-                                                key={goal.id.toString()}
-                                                spacing={1}
-                                                sx={{
-                                                    p: 1.5,
-                                                    borderRadius: '14px',
-                                                    border: '1px solid #1a1a1a',
-                                                    bgcolor: 'rgba(255,255,255,0.015)',
-                                                    minWidth: { xs: '100%', xl: 'calc(50% - 6px)' },
-                                                    flex: 1,
-                                                }}
-                                            >
-                                                <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="flex-start">
-                                                    <Stack spacing={0.35} sx={{ minWidth: 0 }}>
-                                                        <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                                            {goal.title}
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                            {project?.name || 'No project'} • {owner?.name || owner?.email || 'Unknown owner'}
-                                                        </Typography>
-                                                    </Stack>
-                                                    <AIStatusPill label={`${goal.progressPct.toString()}%`} tone="info" />
-                                                </Stack>
-                                                <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.6 }}>
-                                                    {goal.description || 'No goal description yet.'}
-                                                </Typography>
-                                                <Box>
-                                                    <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.8 }}>
-                                                        <Typography variant="caption" sx={{ color: '#666666' }}>
-                                                            Progress
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                            {goal.progressPct.toString()}%
-                                                        </Typography>
-                                                    </Stack>
-                                                    <Box sx={{ height: 8, borderRadius: '999px', bgcolor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                                                        <Box sx={{ width: `${goal.progressPct.toString()}%`, height: '100%', borderRadius: '999px', bgcolor: blockedTasks > 0 ? '#ff9800' : '#38c872' }} />
-                                                    </Box>
-                                                </Box>
-                                                <Stack direction="row" spacing={1.4} flexWrap="wrap" useFlexGap>
-                                                    <Typography variant="caption" sx={{ color: '#d7d7d7' }}>
-                                                        {linkedTasks.length} tasks
-                                                    </Typography>
-                                                    <Typography variant="caption" sx={{ color: '#d7d7d7' }}>
-                                                        {runningTasks} running
-                                                    </Typography>
-                                                    {blockedTasks > 0 ? <Typography variant="caption" sx={{ color: '#ffc47b' }}>{blockedTasks} blocked</Typography> : null}
-                                                    {waitingTasks > 0 ? <Typography variant="caption" sx={{ color: '#ffc47b' }}>{waitingTasks} waiting approval</Typography> : null}
-                                                </Stack>
-                                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                                    <Button size="small" variant="outlined" href={`/ai/goals/${goal.id.toString()}`} sx={{ textTransform: 'none' }}>
-                                                        Open detail
-                                                    </Button>
-                                                    {goal.status !== 'completed' ? (
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            sx={{ textTransform: 'none' }}
-                                                            onClick={() => updateAiGoalProgress({
-                                                                goalId: goal.id,
-                                                                progressPct: BigInt(Math.min(100, Number(goal.progressPct) + 10)),
-                                                                status: Number(goal.progressPct) + 10 >= 100 ? 'completed' : goal.status,
-                                                            }).catch((error) => {
-                                                                toast.error(error instanceof Error ? error.message : 'Failed to update goal');
-                                                            })}
-                                                        >
-                                                            Advance +10%
-                                                        </Button>
-                                                    ) : null}
-                                                </Stack>
-                                            </Stack>
-                                        ))}
-                                    </Stack>
-                                )}
                             </Stack>
-                        ))}
-                    </Stack>
-                </AISectionCard>
+                        );
+                    })}
+                </Box>
+            )}
 
-                <AISectionCard eyebrow="Create" title="Add a goal" description="Capture the outcome, link it to a project if needed, and set the initial progress. ">
-                    <Stack component="form" spacing={1.4} onSubmit={handleCreateGoal}>
+            {/* Create Goal Dialog */}
+            <Dialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{ sx: { bgcolor: '#111111', border: '1px solid #1a1a1a', borderRadius: '8px' } }}
+            >
+                <DialogTitle sx={{ pb: 1 }}>
+                    <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
+                        New Goal
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 1 }}>
+                    <Stack component="form" spacing={1.4} id="create-goal-form" onSubmit={handleCreateGoal}>
                         <TextField
                             size="small"
                             label="Goal title"
                             value={form.title}
                             onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                             placeholder="Reduce proposal turnaround time"
+                            autoFocus
                         />
                         <TextField
                             size="small"
@@ -258,7 +343,7 @@ export function AIGoalsPage() {
                                 label="Project"
                                 value={form.projectId}
                                 onChange={(event) => setForm((current) => ({ ...current, projectId: event.target.value }))}
-                                sx={{ minWidth: 180 }}
+                                sx={{ flex: 1 }}
                             >
                                 <MenuItem value="0">No project</MenuItem>
                                 {aiProjects.map((project) => (
@@ -273,11 +358,11 @@ export function AIGoalsPage() {
                                 label="Status"
                                 value={form.status}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                                sx={{ minWidth: 160 }}
+                                sx={{ flex: 1 }}
                             >
                                 {goalStatuses.map((status) => (
                                     <MenuItem key={status} value={status}>
-                                        {statusConfig[status].title}
+                                        {statusLabel[status]}
                                     </MenuItem>
                                 ))}
                             </TextField>
@@ -287,7 +372,7 @@ export function AIGoalsPage() {
                                 type="number"
                                 value={form.progressPct}
                                 onChange={(event) => setForm((current) => ({ ...current, progressPct: event.target.value }))}
-                                sx={{ minWidth: 140 }}
+                                sx={{ flex: 1 }}
                             />
                         </Stack>
                         <TextField
@@ -298,52 +383,27 @@ export function AIGoalsPage() {
                             onChange={(event) => setForm((current) => ({ ...current, dueAt: event.target.value }))}
                             InputLabelProps={{ shrink: true }}
                         />
-                        <Stack direction="row" justifyContent="flex-end">
-                            <Button type="submit" variant="contained" disabled={currentOrgId == null} sx={{ textTransform: 'none' }}>
-                                Create goal
-                            </Button>
-                        </Stack>
                     </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Roadmap" title="Goal coverage by project" description="See which projects actually have outcomes attached and which goals are still unlinked.">
-                    <Stack spacing={1.2}>
-                        {groupedByProject.withProject.map(({ project, goals }) => (
-                            <Stack key={project.id.toString()} spacing={0.5}>
-                                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                    {project.name}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#858585' }}>
-                                    {goals.length} goals • avg progress {Math.round(goals.reduce((sum, row) => sum + Number(row.goal.progressPct), 0) / goals.length)}%
-                                </Typography>
-                            </Stack>
-                        ))}
-                        {groupedByProject.unlinked.length > 0 ? (
-                            <Stack spacing={0.4}>
-                                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                    Unlinked goals
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#858585' }}>
-                                    {groupedByProject.unlinked.length} goals are not attached to a project yet.
-                                </Typography>
-                            </Stack>
-                        ) : null}
-                        {groupedByProject.withProject.length === 0 && groupedByProject.unlinked.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585' }}>
-                                No goals exist yet.
-                            </Typography>
-                        ) : null}
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Pressure" title="Where to intervene next" description="Goal stack signals that deserve a manager decision first.">
-                    <Stack spacing={1.6}>
-                        <AIProgressRow label="Goals linked to a project" value={aiGoals.length === 0 ? 0 : Math.round((aiGoals.filter((goal) => goal.projectId !== NONE_U64).length / aiGoals.length) * 100)} detail={`${aiGoals.filter((goal) => goal.projectId !== NONE_U64).length} linked`} tone="info" />
-                        <AIProgressRow label="Goals blocked" value={aiGoals.length === 0 ? 0 : Math.round((blockedGoals.length / aiGoals.length) * 100)} detail={`${blockedGoals.length} blocked`} tone="danger" />
-                        <AIProgressRow label="Goals completed" value={aiGoals.length === 0 ? 0 : Math.round((completedGoals.length / aiGoals.length) * 100)} detail={`${completedGoals.length} completed`} tone="success" />
-                    </Stack>
-                </AISectionCard>
-            </AISectionGrid>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #1a1a1a' }}>
+                    <Button
+                        variant="text"
+                        onClick={() => setCreateOpen(false)}
+                        sx={{ textTransform: 'none', color: '#555' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="create-goal-form"
+                        variant="contained"
+                        disabled={currentOrgId == null || !form.title.trim()}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Create goal
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </AIWorkspacePage>
     );
 }

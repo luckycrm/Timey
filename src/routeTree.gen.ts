@@ -29,8 +29,10 @@ import { Route as MeetInviteTokenRouteImport } from './routes/meet.$inviteToken'
 import { Route as BookingTokenRouteImport } from './routes/booking.$token'
 import { Route as AiTasksRouteImport } from './routes/ai.tasks'
 import { Route as AiSettingsRouteImport } from './routes/ai.settings'
+import { Route as AiSecretsRouteImport } from './routes/ai.secrets'
 import { Route as AiProjectsRouteImport } from './routes/ai.projects'
 import { Route as AiOrgRouteImport } from './routes/ai.org'
+import { Route as AiLlmsRouteImport } from './routes/ai.llms'
 import { Route as AiInboxRouteImport } from './routes/ai.inbox'
 import { Route as AiGoalsRouteImport } from './routes/ai.goals'
 import { Route as AiCostsRouteImport } from './routes/ai.costs'
@@ -145,6 +147,11 @@ const AiSettingsRoute = AiSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AiRoute,
 } as any)
+const AiSecretsRoute = AiSecretsRouteImport.update({
+  id: '/secrets',
+  path: '/secrets',
+  getParentRoute: () => AiRoute,
+} as any)
 const AiProjectsRoute = AiProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -153,6 +160,11 @@ const AiProjectsRoute = AiProjectsRouteImport.update({
 const AiOrgRoute = AiOrgRouteImport.update({
   id: '/org',
   path: '/org',
+  getParentRoute: () => AiRoute,
+} as any)
+const AiLlmsRoute = AiLlmsRouteImport.update({
+  id: '/llms',
+  path: '/llms',
   getParentRoute: () => AiRoute,
 } as any)
 const AiInboxRoute = AiInboxRouteImport.update({
@@ -237,8 +249,10 @@ export interface FileRoutesByFullPath {
   '/ai/costs': typeof AiCostsRoute
   '/ai/goals': typeof AiGoalsRouteWithChildren
   '/ai/inbox': typeof AiInboxRoute
+  '/ai/llms': typeof AiLlmsRoute
   '/ai/org': typeof AiOrgRoute
   '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/secrets': typeof AiSecretsRoute
   '/ai/settings': typeof AiSettingsRoute
   '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
@@ -272,8 +286,10 @@ export interface FileRoutesByTo {
   '/ai/costs': typeof AiCostsRoute
   '/ai/goals': typeof AiGoalsRouteWithChildren
   '/ai/inbox': typeof AiInboxRoute
+  '/ai/llms': typeof AiLlmsRoute
   '/ai/org': typeof AiOrgRoute
   '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/secrets': typeof AiSecretsRoute
   '/ai/settings': typeof AiSettingsRoute
   '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
@@ -309,8 +325,10 @@ export interface FileRoutesById {
   '/ai/costs': typeof AiCostsRoute
   '/ai/goals': typeof AiGoalsRouteWithChildren
   '/ai/inbox': typeof AiInboxRoute
+  '/ai/llms': typeof AiLlmsRoute
   '/ai/org': typeof AiOrgRoute
   '/ai/projects': typeof AiProjectsRouteWithChildren
+  '/ai/secrets': typeof AiSecretsRoute
   '/ai/settings': typeof AiSettingsRoute
   '/ai/tasks': typeof AiTasksRouteWithChildren
   '/booking/$token': typeof BookingTokenRoute
@@ -348,8 +366,10 @@ export interface FileRouteTypes {
     | '/ai/costs'
     | '/ai/goals'
     | '/ai/inbox'
+    | '/ai/llms'
     | '/ai/org'
     | '/ai/projects'
+    | '/ai/secrets'
     | '/ai/settings'
     | '/ai/tasks'
     | '/booking/$token'
@@ -383,8 +403,10 @@ export interface FileRouteTypes {
     | '/ai/costs'
     | '/ai/goals'
     | '/ai/inbox'
+    | '/ai/llms'
     | '/ai/org'
     | '/ai/projects'
+    | '/ai/secrets'
     | '/ai/settings'
     | '/ai/tasks'
     | '/booking/$token'
@@ -419,8 +441,10 @@ export interface FileRouteTypes {
     | '/ai/costs'
     | '/ai/goals'
     | '/ai/inbox'
+    | '/ai/llms'
     | '/ai/org'
     | '/ai/projects'
+    | '/ai/secrets'
     | '/ai/settings'
     | '/ai/tasks'
     | '/booking/$token'
@@ -598,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiSettingsRouteImport
       parentRoute: typeof AiRoute
     }
+    '/ai/secrets': {
+      id: '/ai/secrets'
+      path: '/secrets'
+      fullPath: '/ai/secrets'
+      preLoaderRoute: typeof AiSecretsRouteImport
+      parentRoute: typeof AiRoute
+    }
     '/ai/projects': {
       id: '/ai/projects'
       path: '/projects'
@@ -610,6 +641,13 @@ declare module '@tanstack/react-router' {
       path: '/org'
       fullPath: '/ai/org'
       preLoaderRoute: typeof AiOrgRouteImport
+      parentRoute: typeof AiRoute
+    }
+    '/ai/llms': {
+      id: '/ai/llms'
+      path: '/llms'
+      fullPath: '/ai/llms'
+      preLoaderRoute: typeof AiLlmsRouteImport
       parentRoute: typeof AiRoute
     }
     '/ai/inbox': {
@@ -771,8 +809,10 @@ interface AiRouteChildren {
   AiCostsRoute: typeof AiCostsRoute
   AiGoalsRoute: typeof AiGoalsRouteWithChildren
   AiInboxRoute: typeof AiInboxRoute
+  AiLlmsRoute: typeof AiLlmsRoute
   AiOrgRoute: typeof AiOrgRoute
   AiProjectsRoute: typeof AiProjectsRouteWithChildren
+  AiSecretsRoute: typeof AiSecretsRoute
   AiSettingsRoute: typeof AiSettingsRoute
   AiTasksRoute: typeof AiTasksRouteWithChildren
   AiIndexRoute: typeof AiIndexRoute
@@ -785,8 +825,10 @@ const AiRouteChildren: AiRouteChildren = {
   AiCostsRoute: AiCostsRoute,
   AiGoalsRoute: AiGoalsRouteWithChildren,
   AiInboxRoute: AiInboxRoute,
+  AiLlmsRoute: AiLlmsRoute,
   AiOrgRoute: AiOrgRoute,
   AiProjectsRoute: AiProjectsRouteWithChildren,
+  AiSecretsRoute: AiSecretsRoute,
   AiSettingsRoute: AiSettingsRoute,
   AiTasksRoute: AiTasksRouteWithChildren,
   AiIndexRoute: AiIndexRoute,

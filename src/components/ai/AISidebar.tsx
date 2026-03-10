@@ -18,7 +18,7 @@ interface AISidebarProps {
 }
 
 export function AISidebar({ active, signalCounts }: AISidebarProps) {
-    const pageRoutes: Record<AIPageKey, '/ai' | '/ai/agents' | '/ai/tasks' | '/ai/approvals' | '/ai/inbox' | '/ai/activity' | '/ai/projects' | '/ai/goals' | '/ai/costs' | '/ai/org' | '/ai/settings'> = {
+    const pageRoutes: Record<AIPageKey, string> = {
         home: '/ai',
         agents: '/ai/agents',
         tasks: '/ai/tasks',
@@ -30,6 +30,8 @@ export function AISidebar({ active, signalCounts }: AISidebarProps) {
         costs: '/ai/costs',
         org: '/ai/org',
         settings: '/ai/settings',
+        secrets: '/ai/secrets',
+        llms: '/ai/llms',
     };
 
     return (
@@ -65,7 +67,7 @@ export function AISidebar({ active, signalCounts }: AISidebarProps) {
                 </Stack>
             </Box>
 
-            <Stack spacing={0.75}>
+            <Stack spacing={0.75} sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                 {aiPageDefinitions.map((page) => {
                     const Icon = page.icon;
                     const isActive = page.key === active;
@@ -131,7 +133,7 @@ export function AISidebar({ active, signalCounts }: AISidebarProps) {
 
             <Box
                 sx={{
-                    mt: 'auto',
+                    flexShrink: 0,
                     border: `1px solid ${chatColors.border}`,
                     borderRadius: appRadii.panel,
                     bgcolor: 'rgba(255,255,255,0.02)',

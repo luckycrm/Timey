@@ -560,6 +560,81 @@ const spacetimedb = schema({
       updated_at: t.u64(),
     }
   ),
+  ai_task_comment: table(
+    { name: 'ai_task_comment', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      task_id: t.u64().index('btree'),
+      org_id: t.u64(),
+      author_identity: t.identity(),
+      body: t.string(),
+      created_at: t.timestamp(),
+      updated_at: t.timestamp(),
+      is_deleted: t.bool(),
+    }
+  ),
+  ai_label: table(
+    { name: 'ai_label', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      org_id: t.u64().index('btree'),
+      name: t.string(),
+      color: t.string(),
+      created_at: t.timestamp(),
+    }
+  ),
+  ai_task_label: table(
+    { name: 'ai_task_label', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      task_id: t.u64().index('btree'),
+      label_id: t.u64().index('btree'),
+      added_at: t.timestamp(),
+    }
+  ),
+  ai_task_attachment: table(
+    { name: 'ai_task_attachment', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      task_id: t.u64().index('btree'),
+      org_id: t.u64(),
+      uploader_identity: t.identity(),
+      filename: t.string(),
+      url: t.string(),
+      mime_type: t.string(),
+      size_bytes: t.u64(),
+      created_at: t.timestamp(),
+    }
+  ),
+  ai_secret: table(
+    { name: 'ai_secret', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      org_id: t.u64().index('btree'),
+      name: t.string(),
+      description: t.string(),
+      value_encrypted: t.string(),
+      created_by: t.identity(),
+      created_at: t.timestamp(),
+      updated_at: t.timestamp(),
+      is_deleted: t.bool(),
+    }
+  ),
+  ai_llm_provider: table(
+    { name: 'ai_llm_provider', public: true },
+    {
+      id: t.u64().primaryKey().autoInc(),
+      org_id: t.u64().index('btree'),
+      name: t.string(),
+      provider_type: t.string(),
+      api_key_secret_id: t.u64(),
+      base_url: t.string(),
+      model_id: t.string(),
+      is_default: t.bool(),
+      created_at: t.timestamp(),
+      updated_at: t.timestamp(),
+    }
+  ),
 });
 export default spacetimedb;
 
@@ -4994,5 +5069,185 @@ export const editMessage = spacetimedb.reducer(
       content,
       edited_at: now,
     });
+  }
+);
+
+// ─── ai_task_comment reducers ──────────────────────────────────────────────
+
+export const addAiTaskComment = spacetimedb.reducer(
+  { task_id: t.u64(), body: t.string() },
+  (ctx, { task_id, body }) => {
+    if (!body.trim()) throw new Error('Comment body cannot be empty');
+    const now = ctx.timestamp;
+    const task = ctx.db.ai_task.id.find(task_id);
+    if (!task) throw new Error('Task not found');
+    ctx.db.ai_task_comment.insert({
+      id: 0n,
+      task_id,
+      org_id: task.org_id,
+      author_identity: ctx.sender,
+      body: body.trim(),
+      created_at: now,
+      updated_at: now,
+      is_deleted: false,
+    });
+  }
+);
+
+export const editAiTaskComment = spacetimedb.reducer(
+  { comment_id: t.u64(), body: t.string() },
+  (ctx, { comment_id, body }) => {
+    if (!body.trim()) throw new Error('Comment body cannot be empty');
+    const comment = ctx.db.ai_task_comment.id.find(comment_id);
+    if (!comment) throw new Error('Comment not found');
+    if (comment.author_identity.toHexString() !== ctx.sender.toHexString()) {
+      throw new Error('You can only edit your own comments');
+    }
+    ctx.db.ai_task_comment.id.update({ ...comment, body: body.trim(), updated_at: ctx.timestamp });
+  }
+);
+
+export const deleteAiTaskComment = spacetimedb.reducer(
+  { comment_id: t.u64() },
+  (ctx, { comment_id }) => {
+    const comment = ctx.db.ai_task_comment.id.find(comment_id);
+    if (!comment) throw new Error('Comment not found');
+    if (comment.author_identity.toHexString() !== ctx.sender.toHexString()) {
+      throw new Error('You can only delete your own comments');
+    }
+    ctx.db.ai_task_comment.id.update({ ...comment, is_deleted: true, updated_at: ctx.timestamp });
+  }
+);
+
+// ─── ai_label reducers ────────────────────────────────────────────────────
+
+export const createAiLabel = spacetimedb.reducer(
+  { org_id: t.u64(), name: t.string(), color: t.string() },
+  (ctx, { org_id, name, color }) => {
+    if (!name.trim()) throw new Error('Label name cannot be empty');
+    ctx.db.ai_label.insert({ id: 0n, org_id, name: name.trim(), color: color || '#858585', created_at: ctx.timestamp });
+  }
+);
+
+export const deleteAiLabel = spacetimedb.reducer(
+  { label_id: t.u64() },
+  (ctx, { label_id }) => {
+    ctx.db.ai_label.id.delete(label_id);
+  }
+);
+
+// ─── ai_task_label reducers ──────────────────────────────────────────────
+
+export const addAiTaskLabel = spacetimedb.reducer(
+  { task_id: t.u64(), label_id: t.u64() },
+  (ctx, { task_id, label_id }) => {
+    ctx.db.ai_task_label.insert({ id: 0n, task_id, label_id, added_at: ctx.timestamp });
+  }
+);
+
+export const removeAiTaskLabel = spacetimedb.reducer(
+  { task_id: t.u64(), label_id: t.u64() },
+  (ctx, { task_id, label_id }) => {
+    for (const row of ctx.db.ai_task_label.task_id.filter(task_id)) {
+      if (row.label_id === label_id) {
+        ctx.db.ai_task_label.id.delete(row.id);
+        break;
+      }
+    }
+  }
+);
+
+// ─── ai_task_attachment reducers ────────────────────────────────────────
+
+export const addAiTaskAttachment = spacetimedb.reducer(
+  { task_id: t.u64(), org_id: t.u64(), filename: t.string(), url: t.string(), mime_type: t.string(), size_bytes: t.u64() },
+  (ctx, { task_id, org_id, filename, url, mime_type, size_bytes }) => {
+    if (!filename.trim()) throw new Error('Filename cannot be empty');
+    if (!url.trim()) throw new Error('URL cannot be empty');
+    ctx.db.ai_task_attachment.insert({
+      id: 0n, task_id, org_id,
+      uploader_identity: ctx.sender,
+      filename: filename.trim(), url: url.trim(), mime_type: mime_type || 'application/octet-stream',
+      size_bytes, created_at: ctx.timestamp,
+    });
+  }
+);
+
+// ─── ai_secret reducers ──────────────────────────────────────────────────
+
+export const createAiSecret = spacetimedb.reducer(
+  { org_id: t.u64(), name: t.string(), description: t.string(), value_encrypted: t.string() },
+  (ctx, { org_id, name, description, value_encrypted }) => {
+    if (!name.trim()) throw new Error('Secret name cannot be empty');
+    const now = ctx.timestamp;
+    ctx.db.ai_secret.insert({
+      id: 0n, org_id, name: name.trim(), description: description.trim(),
+      value_encrypted, created_by: ctx.sender, created_at: now, updated_at: now, is_deleted: false,
+    });
+  }
+);
+
+export const updateAiSecret = spacetimedb.reducer(
+  { secret_id: t.u64(), name: t.string(), description: t.string(), value_encrypted: t.string() },
+  (ctx, { secret_id, name, description, value_encrypted }) => {
+    const existing = ctx.db.ai_secret.id.find(secret_id);
+    if (!existing || existing.is_deleted) throw new Error('Secret not found');
+    const newValue = value_encrypted.trim() ? value_encrypted : existing.value_encrypted;
+    ctx.db.ai_secret.id.update({
+      ...existing, name: name.trim() || existing.name,
+      description: description.trim(), value_encrypted: newValue, updated_at: ctx.timestamp,
+    });
+  }
+);
+
+export const deleteAiSecret = spacetimedb.reducer(
+  { secret_id: t.u64() },
+  (ctx, { secret_id }) => {
+    const existing = ctx.db.ai_secret.id.find(secret_id);
+    if (!existing) throw new Error('Secret not found');
+    ctx.db.ai_secret.id.update({ ...existing, is_deleted: true, updated_at: ctx.timestamp });
+  }
+);
+
+// ─── ai_llm_provider reducers ────────────────────────────────────────────
+
+export const createAiLlmProvider = spacetimedb.reducer(
+  { org_id: t.u64(), name: t.string(), provider_type: t.string(), base_url: t.string(), model_id: t.string(), api_key_secret_id: t.u64() },
+  (ctx, { org_id, name, provider_type, base_url, model_id, api_key_secret_id }) => {
+    if (!name.trim()) throw new Error('Provider name cannot be empty');
+    const now = ctx.timestamp;
+    ctx.db.ai_llm_provider.insert({
+      id: 0n, org_id, name: name.trim(), provider_type: provider_type || 'custom',
+      api_key_secret_id, base_url: base_url.trim(), model_id: model_id.trim(),
+      is_default: false, created_at: now, updated_at: now,
+    });
+  }
+);
+
+export const updateAiLlmProvider = spacetimedb.reducer(
+  { provider_id: t.u64(), name: t.string(), base_url: t.string(), model_id: t.string(), is_default: t.bool() },
+  (ctx, { provider_id, name, base_url, model_id, is_default }) => {
+    const existing = ctx.db.ai_llm_provider.id.find(provider_id);
+    if (!existing) throw new Error('Provider not found');
+    ctx.db.ai_llm_provider.id.update({
+      ...existing, name: name.trim() || existing.name, base_url: base_url.trim(),
+      model_id: model_id.trim(), is_default, updated_at: ctx.timestamp,
+    });
+  }
+);
+
+export const deleteAiLlmProvider = spacetimedb.reducer(
+  { provider_id: t.u64() },
+  (ctx, { provider_id }) => {
+    ctx.db.ai_llm_provider.id.delete(provider_id);
+  }
+);
+
+export const setDefaultAiLlmProvider = spacetimedb.reducer(
+  { org_id: t.u64(), provider_id: t.u64() },
+  (ctx, { org_id, provider_id }) => {
+    for (const row of ctx.db.ai_llm_provider.org_id.filter(org_id)) {
+      ctx.db.ai_llm_provider.id.update({ ...row, is_default: row.id === provider_id, updated_at: ctx.timestamp });
+    }
   }
 );

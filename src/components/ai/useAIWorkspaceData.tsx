@@ -9,10 +9,15 @@ import type {
     AiAgentRuntime,
     AiApproval,
     AiGoal,
+    AiLabel,
+    AiLlmProvider,
     AiProject,
     AiRun,
     AiRunEvent,
+    AiSecret,
     AiTask,
+    AiTaskComment,
+    AiTaskLabel,
     AiWakeupRequest,
     AiWorkspaceSettings,
     Organization,
@@ -59,6 +64,11 @@ export interface AIWorkspaceData {
     aiAdapterSessions: AiAdapterSession[];
     aiActivities: AiActivity[];
     aiSettings: AiWorkspaceSettings | null;
+    aiLabels: AiLabel[];
+    aiSecrets: AiSecret[];
+    aiTaskComments: AiTaskComment[];
+    aiTaskLabels: AiTaskLabel[];
+    aiLlmProviders: AiLlmProvider[];
 }
 
 const AIWorkspaceDataContext = createContext<AIWorkspaceData | null>(null);
@@ -86,45 +96,28 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
     const currentMembership = memberships[0] ?? null;
     const currentOrgId = currentMembership?.orgId ?? null;
     const aiQuery = shouldQuery && currentOrgId != null;
-    const [allAgents, agentsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_agent.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allProjects, projectsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_project.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allGoals, goalsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_goal.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allTasks, tasksLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_task.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allApprovals, approvalsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_approval.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allConfigRevisions, configRevisionsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_config_revision.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allRuns, runsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_run.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allAgentRuntimes, agentRuntimesLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_agent_runtime.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allWakeups, wakeupsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_wakeup_request.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allRunEvents, runEventsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_run_event.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allAdapterSessions, adapterSessionsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_adapter_session.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allActivities, activitiesLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_activity.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
-    const [allSettingsRows, settingsLoading] = useSpacetimeDBQuery(
-        aiQuery ? tables.ai_workspace_settings.where((row) => row.orgId.eq(currentOrgId)) : 'skip'
-    );
+
+    // Note: .where() generates camelCase column names in SQL (e.g. "orgId") but SpacetimeDB
+    // expects snake_case ("org_id"). Subscribe to the full table and filter client-side instead.
+    const [allAgents, agentsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_agent : 'skip');
+    const [allProjects, projectsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_project : 'skip');
+    const [allGoals, goalsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_goal : 'skip');
+    const [allTasks, tasksLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_task : 'skip');
+    const [allApprovals, approvalsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_approval : 'skip');
+    const [allConfigRevisions, configRevisionsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_config_revision : 'skip');
+    const [allRuns, runsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_run : 'skip');
+    const [allAgentRuntimes, agentRuntimesLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_agent_runtime : 'skip');
+    const [allWakeups, wakeupsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_wakeup_request : 'skip');
+    const [allRunEvents, runEventsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_run_event : 'skip');
+    const [allAdapterSessions, adapterSessionsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_adapter_session : 'skip');
+    const [allActivities, activitiesLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_activity : 'skip');
+    const [allSettingsRows, settingsLoading] = useSpacetimeDBQuery(aiQuery ? tables.ai_workspace_settings : 'skip');
+    const [allLabels] = useSpacetimeDBQuery(aiQuery ? tables.ai_label : 'skip');
+    const [allSecrets] = useSpacetimeDBQuery(aiQuery ? tables.ai_secret : 'skip');
+    const [allTaskComments] = useSpacetimeDBQuery(aiQuery ? tables.ai_task_comment : 'skip');
+    const [allTaskLabels] = useSpacetimeDBQuery(aiQuery ? tables.ai_task_label : 'skip');
+    const [allLlmProviders] = useSpacetimeDBQuery(aiQuery ? tables.ai_llm_provider : 'skip');
+
     const currentOrganization = useMemo(
         () => (currentOrgId == null ? null : allOrganizations.find((org) => org.id === currentOrgId) ?? null),
         [allOrganizations, currentOrgId]
@@ -135,18 +128,24 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
         [allMemberships, currentOrgId]
     );
 
-    const aiAgents = allAgents;
-    const aiProjects = allProjects;
-    const aiGoals = allGoals;
-    const aiTasks = allTasks;
-    const aiApprovals = allApprovals;
-    const aiRuns = allRuns;
-    const aiAgentRuntimes = allAgentRuntimes;
-    const aiWakeupRequests = allWakeups;
-    const aiRunEvents = allRunEvents;
-    const aiAdapterSessions = allAdapterSessions;
-    const aiActivities = allActivities;
-    const aiSettings = allSettingsRows[0] ?? null;
+    // Client-side org filter (server sends all rows since tables are public)
+    const aiAgents = useMemo(() => currentOrgId == null ? [] : allAgents.filter(r => r.orgId === currentOrgId), [allAgents, currentOrgId]);
+    const aiProjects = useMemo(() => currentOrgId == null ? [] : allProjects.filter(r => r.orgId === currentOrgId), [allProjects, currentOrgId]);
+    const aiGoals = useMemo(() => currentOrgId == null ? [] : allGoals.filter(r => r.orgId === currentOrgId), [allGoals, currentOrgId]);
+    const aiTasks = useMemo(() => currentOrgId == null ? [] : allTasks.filter(r => r.orgId === currentOrgId), [allTasks, currentOrgId]);
+    const aiApprovals = useMemo(() => currentOrgId == null ? [] : allApprovals.filter(r => r.orgId === currentOrgId), [allApprovals, currentOrgId]);
+    const aiRuns = useMemo(() => currentOrgId == null ? [] : allRuns.filter(r => r.orgId === currentOrgId), [allRuns, currentOrgId]);
+    const aiAgentRuntimes = useMemo(() => currentOrgId == null ? [] : allAgentRuntimes.filter(r => r.orgId === currentOrgId), [allAgentRuntimes, currentOrgId]);
+    const aiWakeupRequests = useMemo(() => currentOrgId == null ? [] : allWakeups.filter(r => r.orgId === currentOrgId), [allWakeups, currentOrgId]);
+    const aiRunEvents = useMemo(() => currentOrgId == null ? [] : allRunEvents.filter(r => r.orgId === currentOrgId), [allRunEvents, currentOrgId]);
+    const aiAdapterSessions = useMemo(() => currentOrgId == null ? [] : allAdapterSessions.filter(r => r.orgId === currentOrgId), [allAdapterSessions, currentOrgId]);
+    const aiActivities = useMemo(() => currentOrgId == null ? [] : allActivities.filter(r => r.orgId === currentOrgId), [allActivities, currentOrgId]);
+    const aiConfigRevisions = useMemo(() => currentOrgId == null ? [] : allConfigRevisions.filter(r => r.orgId === currentOrgId), [allConfigRevisions, currentOrgId]);
+    const aiSettings = useMemo(() => currentOrgId == null ? null : (allSettingsRows.find(r => r.orgId === currentOrgId) ?? null), [allSettingsRows, currentOrgId]);
+    const aiLabels = useMemo(() => currentOrgId == null ? [] : allLabels.filter(r => r.orgId === currentOrgId), [allLabels, currentOrgId]);
+    const aiSecrets = useMemo(() => currentOrgId == null ? [] : allSecrets.filter(r => r.orgId === currentOrgId), [allSecrets, currentOrgId]);
+    const aiTaskComments = useMemo(() => currentOrgId == null ? [] : allTaskComments.filter(r => r.orgId === currentOrgId), [allTaskComments, currentOrgId]);
+    const aiLlmProviders = useMemo(() => currentOrgId == null ? [] : allLlmProviders.filter(r => r.orgId === currentOrgId), [allLlmProviders, currentOrgId]);
 
     const loading =
         authLoading ||
@@ -191,15 +190,20 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
         aiGoals,
         aiTasks,
         aiApprovals,
-        aiConfigRevisions: allConfigRevisions,
+        aiConfigRevisions,
         aiRuns,
         aiAgentRuntimes,
-        aiAgentRuntimeByAgentId: toAgentRuntimeMap(allAgentRuntimes),
+        aiAgentRuntimeByAgentId: toAgentRuntimeMap(aiAgentRuntimes),
         aiWakeupRequests,
         aiRunEvents,
         aiAdapterSessions,
         aiActivities,
         aiSettings,
+        aiLabels,
+        aiSecrets,
+        aiTaskComments,
+        aiTaskLabels: allTaskLabels,
+        aiLlmProviders,
     };
 }
 

@@ -4,7 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "concurrently --names \"vite,api\" --prefix-colors \"cyan,magenta\" \"vite dev\" \"bun run server/index.ts\"",
+    "dev:vite": "vite dev",
+    "dev:api": "bun run --watch server/index.ts",
     "build": "vite build",
     "preview": "vite preview",
     "start": "PORT=4000 node .output/server/index.mjs",
@@ -34,9 +36,10 @@
   },
   "devDependencies": {
     "@types/node": "^25.3.5",
-    "@vitejs/plugin-react": "^5.1.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "concurrently": "^9.2.1",
     "typescript": "^5.7.2",
     "vite": "^7.1.5",
     "vite-tsconfig-paths": "^6.1.1"

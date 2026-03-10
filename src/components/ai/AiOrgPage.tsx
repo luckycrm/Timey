@@ -1,37 +1,28 @@
 import { useMemo, useState } from 'react';
-import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
+import { AIWorkspacePage, AIStatusPill } from './AIPrimitives';
 import { NONE_U64 } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
-type OrgMode = 'coverage' | 'managers';
-type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+type OrgView = 'departments' | 'managers';
 
-function statusTone(status: string): Tone {
+function statusTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
     switch (status) {
-        case 'active':
-            return 'success';
+        case 'active': return 'success';
         case 'attention':
-        case 'error':
-            return 'danger';
+        case 'error': return 'danger';
         case 'paused':
-        case 'draft':
-            return 'warning';
-        default:
-            return 'neutral';
+        case 'draft': return 'warning';
+        default: return 'neutral';
     }
 }
 
 export function AIOrgPage() {
-    const {
-        aiAgents,
-        members,
-        usersById,
-    } = useAIWorkspaceData();
+    const { aiAgents, members, usersById } = useAIWorkspaceData();
 
-    const [mode, setMode] = useState<OrgMode>('coverage');
+    const [view, setView] = useState<OrgView>('departments');
 
     const departments = useMemo(() => {
         const grouped = new Map<string, typeof aiAgents>();
@@ -41,236 +32,211 @@ export function AIOrgPage() {
             current.push(agent);
             grouped.set(key, current);
         }
-
         return [...grouped.entries()]
             .map(([department, agents]) => ({
                 department,
                 agents,
-                activeCount: agents.filter((agent) => agent.status === 'active').length,
-                attentionCount: agents.filter((agent) => ['attention', 'paused', 'error'].includes(agent.status)).length,
-                unownedCount: agents.filter((agent) => agent.managerUserId === NONE_U64).length,
+                activeCount: agents.filter((a) => a.status === 'active').length,
+                attentionCount: agents.filter((a) => ['attention', 'paused', 'error'].includes(a.status)).length,
+                unownedCount: agents.filter((a) => a.managerUserId === NONE_U64).length,
             }))
-            .sort((left, right) => right.agents.length - left.agents.length);
+            .sort((a, b) => b.agents.length - a.agents.length);
     }, [aiAgents]);
 
     const managerRows = useMemo(() => {
         const byManager = new Map<bigint, typeof aiAgents>();
-
         for (const agent of aiAgents) {
             if (agent.managerUserId === NONE_U64) continue;
             const current = byManager.get(agent.managerUserId) ?? [];
             current.push(agent);
             byManager.set(agent.managerUserId, current);
         }
-
         return [...byManager.entries()]
             .map(([managerId, agents]) => ({
                 managerId,
                 manager: usersById.get(managerId) ?? null,
-                agents: [...agents].sort((left, right) => {
-                    if (left.status !== right.status) return left.status.localeCompare(right.status);
-                    return left.name.localeCompare(right.name);
-                }),
-                activeCount: agents.filter((agent) => agent.status === 'active').length,
-                attentionCount: agents.filter((agent) => ['attention', 'paused', 'error'].includes(agent.status)).length,
+                agents: [...agents].sort((a, b) => a.name.localeCompare(b.name)),
+                activeCount: agents.filter((a) => a.status === 'active').length,
+                attentionCount: agents.filter((a) => ['attention', 'paused', 'error'].includes(a.status)).length,
             }))
-            .sort((left, right) => right.agents.length - left.agents.length);
+            .sort((a, b) => b.agents.length - a.agents.length);
     }, [aiAgents, usersById]);
 
-    const unassignedAgents = aiAgents.filter((agent) => agent.managerUserId === NONE_U64);
-    const attentionAgents = aiAgents.filter((agent) => ['attention', 'paused', 'error'].includes(agent.status));
-    const activeAgents = aiAgents.filter((agent) => agent.status === 'active');
-    const openSeats = Math.max(0, members.length - aiAgents.length);
+    const unassigned = aiAgents.filter((a) => a.managerUserId === NONE_U64);
+    const activeAgents = aiAgents.filter((a) => a.status === 'active');
+    const attentionAgents = aiAgents.filter((a) => ['attention', 'paused', 'error'].includes(a.status));
 
     return (
         <AIWorkspacePage page="org">
-            <AIPageIntro
-                eyebrow="Org"
-                title="See how AI work is staffed across the workspace"
-                description="This page now reads like an operating roster: which departments are covered, which managers are carrying load, and where AI roles still have no owner."
-                actionSlot={
-                    <Stack direction="row" spacing={1}>
-                        <Button
-                            variant={mode === 'coverage' ? 'contained' : 'outlined'}
-                            sx={{ textTransform: 'none' }}
-                            onClick={() => setMode('coverage')}
-                        >
-                            Coverage view
-                        </Button>
-                        <Button
-                            variant={mode === 'managers' ? 'contained' : 'outlined'}
-                            sx={{ textTransform: 'none' }}
-                            onClick={() => setMode('managers')}
-                        >
-                            Manager view
-                        </Button>
-                    </Stack>
-                }
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Org
+                </Typography>
+                <Stack direction="row" spacing={0.75}>
+                    <button
+                        onClick={() => setView('departments')}
+                        style={{
+                            padding: '4px 10px',
+                            border: '1px solid',
+                            borderColor: view === 'departments' ? '#fff' : '#1a1a1a',
+                            borderRadius: 4,
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: view === 'departments' ? '#fff' : '#555',
+                            fontSize: '0.75rem',
+                        }}
+                    >
+                        Departments
+                    </button>
+                    <button
+                        onClick={() => setView('managers')}
+                        style={{
+                            padding: '4px 10px',
+                            border: '1px solid',
+                            borderColor: view === 'managers' ? '#fff' : '#1a1a1a',
+                            borderRadius: 4,
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: view === 'managers' ? '#fff' : '#555',
+                            fontSize: '0.75rem',
+                        }}
+                    >
+                        Managers
+                    </button>
+                </Stack>
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Active AI roles" value={String(activeAgents.length)} caption={`${aiAgents.length} total roles on the roster`} tone="success" />
-                <AIStatCard label="Managers attached" value={String(managerRows.length)} caption={`${unassignedAgents.length} agents still need a manager`} tone="info" />
-                <AIStatCard label="Attention needed" value={String(attentionAgents.length)} caption="Paused, error, or flagged for follow-up" tone="warning" />
-                <AIStatCard label="Open seats" value={String(openSeats)} caption="Approximate gap versus human workspace headcount" tone="neutral" />
-            </AIStatGrid>
+            {/* Summary line */}
+            <Typography variant="caption" sx={{ color: '#555' }}>
+                {aiAgents.length} agents — {activeAgents.length} active
+                {attentionAgents.length > 0 && ` · ${attentionAgents.length} need attention`}
+                {unassigned.length > 0 && ` · ${unassigned.length} unassigned`}
+                {members.length > 0 && ` · ${members.length} workspace members`}
+            </Typography>
 
-            <AISectionGrid>
-                {mode === 'coverage' ? (
-                    <>
-                        <AISectionCard eyebrow="Coverage" title="Department coverage" description="Use this view to see where AI is staffed, thin, or missing ownership.">
-                            <Stack spacing={1.15}>
-                                {departments.length === 0 ? (
-                                    <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                        No agents exist yet, so there is no AI org coverage to show.
-                                    </Typography>
-                                ) : departments.map((group) => (
-                                    <Stack
-                                        key={group.department}
-                                        direction={{ xs: 'column', md: 'row' }}
-                                        justifyContent="space-between"
-                                        spacing={1}
-                                        sx={{
-                                            p: 1.4,
-                                            borderRadius: '14px',
-                                            border: '1px solid #1a1a1a',
-                                            bgcolor: 'rgba(255,255,255,0.015)',
-                                        }}
-                                    >
-                                        <Stack spacing={0.45}>
-                                            <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                                {group.department}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                {group.agents.length} roles • {group.activeCount} active • {group.attentionCount} need attention
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#666666' }}>
-                                                {group.unownedCount > 0 ? `${group.unownedCount} roles need a manager assigned.` : 'Manager coverage is in place.'}
-                                            </Typography>
-                                        </Stack>
-                                        <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap alignItems="center">
-                                            <AIStatusPill label={`${group.activeCount} active`} tone={group.activeCount > 0 ? 'success' : 'warning'} />
-                                            {group.attentionCount > 0 ? <AIStatusPill label={`${group.attentionCount} flagged`} tone="danger" /> : null}
-                                            {group.unownedCount > 0 ? <AIStatusPill label={`${group.unownedCount} unowned`} tone="warning" /> : null}
-                                        </Stack>
-                                    </Stack>
-                                ))}
-                            </Stack>
-                        </AISectionCard>
-
-                        <AISectionCard eyebrow="Gaps" title="Coverage gaps" description="These are the quickest interventions to improve operator control.">
-                            <Stack spacing={1.15}>
-                                <Typography variant="body2" sx={{ color: '#ffffff', lineHeight: 1.7 }}>
-                                    {unassignedAgents.length} AI roles do not have a human manager attached yet.
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#ffffff', lineHeight: 1.7 }}>
-                                    {attentionAgents.length} roles are paused, failing, or explicitly flagged for attention.
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                    Open seats are only a rough proxy. They compare workspace members to AI roles until a richer staffing model exists.
-                                </Typography>
-                            </Stack>
-                        </AISectionCard>
-                    </>
+            {/* Department view */}
+            {view === 'departments' && (
+                aiAgents.length === 0 ? (
+                    <Box sx={{ py: 8, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#555' }}>No agents yet.</Typography>
+                    </Box>
                 ) : (
-                    <>
-                        <AISectionCard eyebrow="Managers" title="Manager-to-agent view" description="This is the honest first org chart for Timey: human managers and the AI roles they directly own.">
-                            <Stack spacing={1.15}>
-                                {managerRows.length === 0 ? (
-                                    <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                        No manager assignments exist yet.
+                    <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                        {departments.map((group, i) => (
+                            <Stack
+                                key={group.department}
+                                direction="row"
+                                alignItems="center"
+                                justifyContent="space-between"
+                                sx={{
+                                    px: 2,
+                                    py: 1.5,
+                                    borderBottom: i < departments.length - 1 ? '1px solid #1a1a1a' : 'none',
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                }}
+                            >
+                                <Stack spacing={0.2}>
+                                    <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{group.department}</Typography>
+                                    <Typography variant="caption" sx={{ color: '#555' }}>
+                                        {group.agents.length} agent{group.agents.length !== 1 ? 's' : ''} • {group.activeCount} active
+                                        {group.unownedCount > 0 ? ` • ${group.unownedCount} unowned` : ''}
                                     </Typography>
-                                ) : managerRows.map((row) => (
-                                    <Stack
-                                        key={row.managerId.toString()}
-                                        spacing={1}
-                                        sx={{
-                                            p: 1.4,
-                                            borderRadius: '14px',
-                                            border: '1px solid #1a1a1a',
-                                            bgcolor: 'rgba(255,255,255,0.015)',
-                                        }}
-                                    >
-                                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
-                                            <Stack spacing={0.35}>
-                                                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 650 }}>
-                                                    {row.manager?.name || row.manager?.email || 'Unknown manager'}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                    {row.agents.length} assigned agents • {row.activeCount} active • {row.attentionCount} need attention
-                                                </Typography>
-                                            </Stack>
-                                            <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-                                                <AIStatusPill label={`${row.agents.length} roles`} tone="info" />
-                                                {row.attentionCount > 0 ? <AIStatusPill label={`${row.attentionCount} flagged`} tone="danger" /> : null}
-                                            </Stack>
-                                        </Stack>
-
-                                        <Stack spacing={0.9}>
-                                            {row.agents.map((agent) => (
-                                                <Stack
-                                                    key={agent.id.toString()}
-                                                    direction={{ xs: 'column', md: 'row' }}
-                                                    justifyContent="space-between"
-                                                    spacing={1}
-                                                    sx={{
-                                                        p: 1.15,
-                                                        borderRadius: '12px',
-                                                        bgcolor: 'rgba(255,255,255,0.035)',
-                                                    }}
-                                                >
-                                                    <Stack spacing={0.35}>
-                                                        <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                                            {agent.name}
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                            {agent.role} • {agent.department || 'General'}
-                                                        </Typography>
-                                                    </Stack>
-                                                    <AIStatusPill label={agent.status} tone={statusTone(agent.status)} />
-                                                </Stack>
-                                            ))}
-                                        </Stack>
-                                    </Stack>
-                                ))}
+                                </Stack>
+                                <Stack direction="row" spacing={0.75} alignItems="center">
+                                    <AIStatusPill label={`${group.activeCount} active`} tone={group.activeCount > 0 ? 'success' : 'neutral'} />
+                                    {group.attentionCount > 0 && <AIStatusPill label={`${group.attentionCount} flagged`} tone="danger" />}
+                                </Stack>
                             </Stack>
-                        </AISectionCard>
+                        ))}
+                    </Box>
+                )
+            )}
 
-                        <AISectionCard eyebrow="Unassigned" title="Roles without a manager" description="These agents are active in the roster but still have no direct human owner.">
-                            <Stack spacing={1.05}>
-                                {unassignedAgents.length === 0 ? (
-                                    <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                        Every AI role has a manager assigned.
+            {/* Manager view */}
+            {view === 'managers' && (
+                <Stack spacing={1.5}>
+                    {managerRows.length === 0 ? (
+                        <Box sx={{ py: 8, textAlign: 'center' }}>
+                            <Typography variant="body2" sx={{ color: '#555' }}>No manager assignments yet.</Typography>
+                        </Box>
+                    ) : managerRows.map((row) => (
+                        <Stack key={row.managerId.toString()} spacing={0.75} sx={{ border: '1px solid #1a1a1a', borderRadius: 1, overflow: 'hidden' }}>
+                            {/* Manager header */}
+                            <Stack
+                                direction="row"
+                                alignItems="center"
+                                justifyContent="space-between"
+                                sx={{ px: 2, py: 1.25, borderBottom: '1px solid #1a1a1a', bgcolor: 'rgba(255,255,255,0.02)' }}
+                            >
+                                <Stack spacing={0.15}>
+                                    <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700 }}>
+                                        {row.manager?.name || row.manager?.email || 'Unknown manager'}
                                     </Typography>
-                                ) : unassignedAgents.map((agent) => (
+                                    <Typography variant="caption" sx={{ color: '#555' }}>
+                                        {row.agents.length} agent{row.agents.length !== 1 ? 's' : ''} • {row.activeCount} active
+                                    </Typography>
+                                </Stack>
+                                <Stack direction="row" spacing={0.75}>
+                                    {row.attentionCount > 0 && <AIStatusPill label={`${row.attentionCount} flagged`} tone="danger" />}
+                                </Stack>
+                            </Stack>
+                            {/* Agent rows */}
+                            {row.agents.map((agent, i) => (
+                                <Stack
+                                    key={agent.id.toString()}
+                                    direction="row"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    sx={{
+                                        px: 2,
+                                        py: 1,
+                                        borderBottom: i < row.agents.length - 1 ? '1px solid #111' : 'none',
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                    }}
+                                >
+                                    <Stack spacing={0.1}>
+                                        <Typography variant="body2" sx={{ color: '#c8c8c8', fontWeight: 500 }}>{agent.name}</Typography>
+                                        <Typography variant="caption" sx={{ color: '#444' }}>{agent.role} • {agent.department || 'General'}</Typography>
+                                    </Stack>
+                                    <AIStatusPill label={agent.status} tone={statusTone(agent.status)} />
+                                </Stack>
+                            ))}
+                        </Stack>
+                    ))}
+
+                    {/* Unassigned */}
+                    {unassigned.length > 0 && (
+                        <Stack spacing={0.75}>
+                            <Typography variant="caption" sx={{ color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Unassigned ({unassigned.length})
+                            </Typography>
+                            <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                                {unassigned.map((agent, i) => (
                                     <Stack
                                         key={agent.id.toString()}
-                                        direction={{ xs: 'column', md: 'row' }}
+                                        direction="row"
+                                        alignItems="center"
                                         justifyContent="space-between"
-                                        spacing={1}
                                         sx={{
-                                            p: 1.3,
-                                            borderRadius: '14px',
-                                            border: '1px solid #1a1a1a',
-                                            bgcolor: 'rgba(255,255,255,0.015)',
+                                            px: 2,
+                                            py: 1.25,
+                                            borderBottom: i < unassigned.length - 1 ? '1px solid #1a1a1a' : 'none',
+                                            '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
                                         }}
                                     >
-                                        <Stack spacing={0.35}>
-                                            <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                                {agent.name}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#858585' }}>
-                                                {agent.role} • {agent.department || 'General'}
-                                            </Typography>
+                                        <Stack spacing={0.15}>
+                                            <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{agent.name}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#555' }}>{agent.role} • {agent.department || 'General'}</Typography>
                                         </Stack>
                                         <AIStatusPill label={agent.status} tone={statusTone(agent.status)} />
                                     </Stack>
                                 ))}
-                            </Stack>
-                        </AISectionCard>
-                    </>
-                )}
-            </AISectionGrid>
+                            </Box>
+                        </Stack>
+                    )}
+                </Stack>
+            )}
         </AIWorkspacePage>
     );
 }

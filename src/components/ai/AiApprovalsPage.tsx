@@ -1,13 +1,23 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useReducer } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AIProgressRow, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
-import { formatBigIntDateTime, formatRelativeTime, NONE_U64 } from './aiUtils';
+import { AIWorkspacePage } from './AIPrimitives';
+import { formatRelativeTime, NONE_U64 } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
+
+type ApprovalTab = 'pending' | 'resolved' | 'all';
+
+const TABS: { value: ApprovalTab; label: string }[] = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'all', label: 'All' },
+];
 
 export function AIApprovalsPage() {
     const {
@@ -18,7 +28,7 @@ export function AIApprovalsPage() {
     } = useAIWorkspaceData();
 
     const decideAiApproval = useReducer(reducers.decideAiApproval);
-
+    const [tab, setTab] = useState<ApprovalTab>('pending');
     const now = Date.now();
 
     const approvalsWithContext = useMemo(
@@ -34,29 +44,17 @@ export function AIApprovalsPage() {
         [aiAgents, aiApprovals, aiTasks, usersById]
     );
 
-    const pendingApprovals = approvalsWithContext.filter((row) => row.approval.status === 'pending');
-    const resolvedToday = approvalsWithContext.filter((row) =>
-        row.approval.status !== 'pending' &&
-        row.approval.decidedAt !== NONE_U64 &&
-        new Date(Number(row.approval.decidedAt)).toDateString() === new Date(now).toDateString()
-    );
-    const approvedToday = resolvedToday.filter((row) => row.approval.status === 'approved').length;
-    const rejectedToday = resolvedToday.filter((row) => row.approval.status === 'rejected').length;
-    const oldestPending = pendingApprovals.length === 0
-        ? null
-        : pendingApprovals[pendingApprovals.length - 1]?.approval.createdAt ?? null;
+    const filtered = useMemo(() => {
+        if (tab === 'pending') return approvalsWithContext.filter((r) => r.approval.status === 'pending');
+        if (tab === 'resolved') return approvalsWithContext.filter((r) => r.approval.status !== 'pending');
+        return approvalsWithContext;
+    }, [approvalsWithContext, tab]);
 
-    const riskCounts = useMemo(() => {
-        const pending = pendingApprovals.length || 1;
-        const highRisk = pendingApprovals.filter((row) => row.approval.riskLevel === 'high' || row.approval.riskLevel === 'critical').length;
-        const mediumRisk = pendingApprovals.filter((row) => row.approval.riskLevel === 'medium').length;
-        const lowRisk = pendingApprovals.filter((row) => row.approval.riskLevel === 'low').length;
-        return {
-            high: Math.round((highRisk / pending) * 100),
-            medium: Math.round((mediumRisk / pending) * 100),
-            low: Math.round((lowRisk / pending) * 100),
-        };
-    }, [pendingApprovals]);
+    const tabCount = (t: ApprovalTab) => {
+        if (t === 'pending') return approvalsWithContext.filter((r) => r.approval.status === 'pending').length;
+        if (t === 'resolved') return approvalsWithContext.filter((r) => r.approval.status !== 'pending').length;
+        return approvalsWithContext.length;
+    };
 
     const handleDecision = async (approvalId: bigint, status: 'approved' | 'rejected') => {
         try {
@@ -67,141 +65,176 @@ export function AIApprovalsPage() {
         }
     };
 
+    const riskColor = (level: string) =>
+        level === 'high' || level === 'critical' ? '#e33d4f' :
+        level === 'medium' ? '#ff9800' : '#555';
+
     return (
         <AIWorkspacePage page="approvals">
-            <AIPageIntro
-                eyebrow="Approvals"
-                title="Decide what can move forward"
-                description="Approvals are now live workspace records. Review the pending queue, decide directly here, and keep the task board unblocked."
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Approvals
+                </Typography>
+                {approvalsWithContext.filter((r) => r.approval.status === 'pending').length > 0 && (
+                    <Typography variant="caption" sx={{ color: '#ff9800' }}>
+                        {approvalsWithContext.filter((r) => r.approval.status === 'pending').length} pending
+                    </Typography>
+                )}
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Pending" value={String(pendingApprovals.length)} caption={oldestPending ? `Oldest request ${formatRelativeTime(oldestPending, now)}` : 'No queue right now'} tone="warning" />
-                <AIStatCard label="Resolved today" value={String(resolvedToday.length)} caption={`${approvedToday} approved, ${rejectedToday} rejected`} tone="success" />
-                <AIStatCard label="High risk" value={String(pendingApprovals.filter((row) => row.approval.riskLevel === 'high' || row.approval.riskLevel === 'critical').length)} caption="Requests that should be reviewed first" tone="danger" />
-                <AIStatCard label="Waiting on reviewers" value={String(aiTasks.filter((task) => task.status === 'waiting_approval').length)} caption="Tasks currently blocked by approval state" tone="info" />
-            </AIStatGrid>
+            {/* Tabs */}
+            <Stack direction="row" spacing={0} sx={{ borderBottom: '1px solid #1a1a1a', mt: -0.5 }}>
+                {TABS.map((t) => (
+                    <button
+                        key={t.value}
+                        onClick={() => setTab(t.value)}
+                        style={{
+                            padding: '6px 14px',
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: tab === t.value ? '#ffffff' : '#555',
+                            borderBottom: tab === t.value ? '2px solid #ffffff' : '2px solid transparent',
+                            fontSize: '0.8rem',
+                            fontWeight: tab === t.value ? 600 : 400,
+                            transition: 'color 0.15s',
+                        }}
+                    >
+                        {t.label}
+                        {tabCount(t.value) > 0 && (
+                            <span style={{ marginLeft: 5, fontSize: '0.7rem', color: tab === t.value ? '#858585' : '#444' }}>
+                                {tabCount(t.value)}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </Stack>
 
-            <AISectionGrid>
-                <AISectionCard
-                    eyebrow="Queue"
-                    title="Pending approval requests"
-                    description="Approve or reject directly here. The linked task status updates with the decision."
-                >
-                    <Stack spacing={1.2}>
-                        {pendingApprovals.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                No approvals are waiting right now.
-                            </Typography>
-                        ) : pendingApprovals.map(({ approval, task, agent, requester }) => (
-                            <Stack
-                                key={approval.id.toString()}
-                                spacing={1}
+            {/* Count */}
+            {filtered.length > 0 && (
+                <Typography variant="caption" sx={{ color: '#555' }}>
+                    {filtered.length} approval{filtered.length !== 1 ? 's' : ''}
+                </Typography>
+            )}
+
+            {/* Approval list */}
+            {aiApprovals.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#555' }}>
+                        No approval records yet.
+                    </Typography>
+                </Box>
+            ) : filtered.length === 0 ? (
+                <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                    <Box sx={{ py: 6, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#555' }}>
+                            No approvals match this filter.
+                        </Typography>
+                    </Box>
+                </Box>
+            ) : (
+                <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                    {filtered.map(({ approval, task, agent, requester, reviewer }) => (
+                        <Stack
+                            key={approval.id.toString()}
+                            direction="row"
+                            alignItems="center"
+                            spacing={2}
+                            sx={{
+                                px: 2,
+                                py: 1.5,
+                                borderBottom: '1px solid #1a1a1a',
+                                '&:last-child': { borderBottom: 'none' },
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                            }}
+                        >
+                            {/* Risk dot */}
+                            <Box
                                 sx={{
-                                    px: 1.6,
-                                    py: 1.4,
-                                    borderRadius: '14px',
-                                    border: '1px solid #1a1a1a',
-                                    bgcolor: 'rgba(255,255,255,0.015)',
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: '50%',
+                                    bgcolor: riskColor(approval.riskLevel),
+                                    flexShrink: 0,
                                 }}
-                            >
-                                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
-                                    <Stack spacing={0.5}>
-                                        <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                            {approval.title}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                            {task?.title || 'No task linked'} • {agent?.name || 'No agent linked'}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#666666' }}>
-                                            Requested by {requester?.name || requester?.email || 'Unknown'} • {formatRelativeTime(approval.createdAt, now)}
-                                        </Typography>
-                                    </Stack>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <AIStatusPill label={approval.riskLevel} tone={approval.riskLevel === 'high' || approval.riskLevel === 'critical' ? 'danger' : approval.riskLevel === 'medium' ? 'warning' : 'info'} />
-                                        <AIStatusPill label={approval.status} tone="warning" />
-                                    </Stack>
-                                </Stack>
-                                <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                    {approval.summary || 'No approval summary provided.'}
-                                </Typography>
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        href={`/ai/approvals/${approval.id.toString()}`}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        Details
-                                    </Button>
-                                    <Button size="small" variant="contained" sx={{ textTransform: 'none' }} onClick={() => handleDecision(approval.id, 'approved')}>
-                                        Approve
-                                    </Button>
-                                    <Button size="small" variant="outlined" color="error" sx={{ textTransform: 'none' }} onClick={() => handleDecision(approval.id, 'rejected')}>
-                                        Reject
-                                    </Button>
-                                </Stack>
-                            </Stack>
-                        ))}
-                    </Stack>
-                </AISectionCard>
+                            />
 
-                <AISectionCard
-                    eyebrow="Mix"
-                    title="Risk distribution"
-                    description="The current queue split by declared risk level."
-                >
-                    <Stack spacing={1.6}>
-                        <AIProgressRow label="High risk" value={riskCounts.high} detail={`${pendingApprovals.filter((row) => row.approval.riskLevel === 'high' || row.approval.riskLevel === 'critical').length} requests`} tone="danger" />
-                        <AIProgressRow label="Medium risk" value={riskCounts.medium} detail={`${pendingApprovals.filter((row) => row.approval.riskLevel === 'medium').length} requests`} tone="warning" />
-                        <AIProgressRow label="Low risk" value={riskCounts.low} detail={`${pendingApprovals.filter((row) => row.approval.riskLevel === 'low').length} requests`} tone="success" />
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard
-                    eyebrow="Signals"
-                    title="Queue pressure"
-                    description="Short operational guidance based on the current approval state."
-                >
-                    <Stack spacing={1.1}>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {pendingApprovals.length === 0
-                                ? 'The approval queue is clear.'
-                                : `${pendingApprovals.length} approvals are waiting, with ${pendingApprovals.filter((row) => row.approval.riskLevel === 'high' || row.approval.riskLevel === 'critical').length} at high risk.`}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {aiTasks.filter((task) => task.status === 'waiting_approval').length} tasks are blocked behind reviewer action.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            The oldest unresolved approval is {oldestPending ? formatBigIntDateTime(oldestPending) : 'not applicable'}.
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard
-                    eyebrow="History"
-                    title="Recent decisions"
-                    description="Latest resolved approvals with reviewer and timing context."
-                >
-                    <Stack spacing={1.1}>
-                        {approvalsWithContext.filter((row) => row.approval.status !== 'pending').slice(0, 6).map(({ approval, reviewer, task }) => (
-                            <Stack key={approval.id.toString()} spacing={0.35}>
+                            {/* Main content */}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
                                     {approval.title}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: '#858585' }}>
-                                    {approval.status} by {reviewer?.name || reviewer?.email || 'Unknown'} • {task?.title || 'No task'} • {formatBigIntDateTime(approval.decidedAt)}
+                                <Typography variant="caption" sx={{ color: '#555' }}>
+                                    {task?.title || 'No task linked'}
+                                    {agent ? ` • ${agent.name}` : ''}
+                                    {' • '}
+                                    {approval.status === 'pending'
+                                        ? `requested ${formatRelativeTime(approval.createdAt, now)} by ${requester?.name || requester?.email || 'Unknown'}`
+                                        : `${approval.status} by ${reviewer?.name || reviewer?.email || 'Unknown'}`}
                                 </Typography>
+                            </Box>
+
+                            {/* Right: risk + status + actions */}
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                                <Chip
+                                    size="small"
+                                    label={approval.riskLevel}
+                                    sx={{
+                                        fontSize: '0.7rem',
+                                        height: 20,
+                                        bgcolor: 'transparent',
+                                        color: riskColor(approval.riskLevel),
+                                        border: '1px solid #1a1a1a',
+                                        borderRadius: '4px',
+                                    }}
+                                />
+                                <Chip
+                                    size="small"
+                                    label={approval.status}
+                                    sx={{
+                                        fontSize: '0.7rem',
+                                        height: 20,
+                                        bgcolor: 'transparent',
+                                        color: approval.status === 'approved' ? '#38c872' : approval.status === 'rejected' ? '#e33d4f' : '#ff9800',
+                                        border: '1px solid #1a1a1a',
+                                        borderRadius: '4px',
+                                    }}
+                                />
+                                {approval.status === 'pending' && (
+                                    <>
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            sx={{ textTransform: 'none', color: '#38c872', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                            onClick={() => handleDecision(approval.id, 'approved')}
+                                        >
+                                            Approve
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            sx={{ textTransform: 'none', color: '#e33d4f', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                            onClick={() => handleDecision(approval.id, 'rejected')}
+                                        >
+                                            Reject
+                                        </Button>
+                                    </>
+                                )}
+                                <Button
+                                    component="a"
+                                    href={`/ai/approvals/${approval.id.toString()}`}
+                                    size="small"
+                                    variant="text"
+                                    sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1, '&:hover': { color: '#fff' } }}
+                                >
+                                    Details →
+                                </Button>
                             </Stack>
-                        ))}
-                        {approvalsWithContext.filter((row) => row.approval.status !== 'pending').length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                No approval decisions have been recorded yet.
-                            </Typography>
-                        ) : null}
-                    </Stack>
-                </AISectionCard>
-            </AISectionGrid>
+                        </Stack>
+                    ))}
+                </Box>
+            )}
         </AIWorkspacePage>
     );
 }

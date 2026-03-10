@@ -8,13 +8,20 @@ import { Link } from '@tanstack/react-router';
 import { useReducer } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
+import { AISectionCard, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
 import { formatBigIntDateTime, formatRelativeTime, formatUsd, microusdToUsd, NONE_U64, parseJsonList, safeParseBigInt } from './aiUtils';
 import { AIRuntimeListCard, AIRuntimeSlotsCard, humanizeRuntimeToken, readEnabledIntegrationLabels } from './AIRuntimeDetailBlocks';
 import { AIRevisionHistoryCard } from './AIRevisionHistoryCard';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
+import { AdapterConfigForm } from './adapters/AdapterConfigForm';
+import type { AdapterType } from './adapters/AdapterTypes';
+import { adapterTypeOptions } from './adapters/adapterRegistry';
 
-const runtimeAdapterOptions = ['manual', 'process', 'http', 'claude_local', 'codex_local'] as const;
+// Adapter type options: manual + all registry types
+const runtimeAdapterOptions: Array<{ value: string; label: string }> = [
+    { value: 'manual', label: 'Manual' },
+    ...adapterTypeOptions,
+];
 const runtimeStatusOptions = ['idle', 'ready', 'disabled', 'error'] as const;
 const wakeupSourceOptions = ['manual', 'timer', 'assignment', 'automation'] as const;
 
@@ -118,9 +125,6 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
     const agent = parsedId == null ? null : aiAgents.find((row) => row.id === parsedId) ?? null;
     const project = agent ? aiProjects.find((row) => row.id === agent.projectId) ?? null : null;
     const owner = agent ? usersById.get(agent.ownerUserId) ?? null : null;
-    const manager = agent && agent.managerUserId !== NONE_U64
-        ? usersById.get(agent.managerUserId) ?? null
-        : null;
     const runtime = agent ? aiAgentRuntimeByAgentId.get(agent.id) ?? null : null;
     const tools = agent ? parseJsonList(agent.toolsJson) : [];
     const schedule = agent ? readAgentSchedule(agent.scheduleJson) : { cadence: 'manual', triggers: [] };
@@ -212,11 +216,14 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
         reason: '',
         payloadJson: '{}',
     });
+    const [adapterConfig, setAdapterConfig] = useState<Record<string, unknown>>({});
     const [savingRuntime, setSavingRuntime] = useState(false);
     const [queueingWakeup, setQueueingWakeup] = useState(false);
     const [restoringRevisionId, setRestoringRevisionId] = useState<bigint | null>(null);
 
     useEffect(() => {
+        let parsedConfig: Record<string, unknown> = {};
+        try { parsedConfig = JSON.parse(runtime?.configJson || '{}') as Record<string, unknown>; } catch { /* ignore */ }
         setRuntimeForm({
             adapterType: runtime?.adapterType || 'manual',
             runtimeStatus: runtime?.runtimeStatus || 'idle',
@@ -228,6 +235,7 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
             heartbeatPolicyJson: runtime?.heartbeatPolicyJson || '{}',
             wakePolicyJson: runtime?.wakePolicyJson || '{}',
         });
+        setAdapterConfig(parsedConfig);
     }, [runtime]);
 
     const runtimeSlots = [
@@ -356,8 +364,7 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
         }
     };
 
-    const handleSaveRuntime = async (event: React.FormEvent) => {
-        event.preventDefault();
+    const doSaveRuntime = async (configOverride?: Record<string, unknown>) => {
         if (!agent || currentOrgId == null) return;
         try {
             setSavingRuntime(true);
@@ -370,7 +377,7 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
                 command: runtimeForm.command.trim(),
                 cwd: runtimeForm.cwd.trim(),
                 envJson: runtimeForm.envJson.trim() || '{}',
-                configJson: runtimeForm.configJson.trim() || '{}',
+                configJson: JSON.stringify(configOverride ?? adapterConfig),
                 heartbeatPolicyJson: runtimeForm.heartbeatPolicyJson.trim() || '{}',
                 wakePolicyJson: runtimeForm.wakePolicyJson.trim() || '{}',
             });
@@ -380,6 +387,11 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
         } finally {
             setSavingRuntime(false);
         }
+    };
+
+    const handleSaveRuntime = (event: React.FormEvent) => {
+        event.preventDefault();
+        void doSaveRuntime();
     };
 
     const handleQueueWakeup = async (event: React.FormEvent) => {
@@ -423,53 +435,45 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
     if (!agent) {
         return (
             <AIWorkspacePage page="agents">
-                <AIPageIntro
-                    eyebrow="Agents"
-                    title="Agent not found"
-                    description="The requested agent does not exist in this workspace or the id is invalid."
-                    actionSlot={(
-                        <Button component={Link} to="/ai/agents" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back to agents
-                        </Button>
-                    )}
-                />
+                <Stack direction="row" alignItems="center" spacing={1}>
+                    <Button component={Link} to="/ai/agents" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0.5 }}>
+                        ← Agents
+                    </Button>
+                </Stack>
+                <Typography variant="body2" sx={{ color: '#555' }}>Agent not found.</Typography>
             </AIWorkspacePage>
         );
     }
 
     return (
         <AIWorkspacePage page="agents">
-            <AIPageIntro
-                eyebrow="Agent detail"
-                title={agent.name}
-                description={agent.description || `${agent.role} in ${agent.department}.`}
-                supportingCopy={`Owner ${owner?.name || owner?.email || 'Unknown'}${manager ? ` • Manager ${manager.name || manager.email}` : ''}${project ? ` • ${project.name}` : ''}`}
-                actionSlot={(
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} to="/ai/agents" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back
-                        </Button>
-                        {agent.status === 'active' ? (
-                            <Button variant="outlined" sx={{ textTransform: 'none' }} onClick={() => handleStatusChange('paused')}>
-                                Pause
-                            </Button>
-                        ) : (
-                            <Button variant="contained" sx={{ textTransform: 'none' }} onClick={() => handleStatusChange('active')}>
-                                Activate
-                            </Button>
-                        )}
+            {/* Header */}
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+                <Stack spacing={0.5}>
+                    <Button component={Link} to="/ai/agents" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0, alignSelf: 'flex-start' }}>
+                        ← Agents
+                    </Button>
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>{agent.name}</Typography>
+                        <AIStatusPill label={agent.status} tone={agent.status === 'active' ? 'success' : agent.status === 'attention' ? 'warning' : 'neutral'} />
                     </Stack>
-                )}
-            />
+                    <Typography variant="caption" sx={{ color: '#555' }}>
+                        {agent.role} • {agent.department}
+                        {owner ? ` • ${owner.name || owner.email}` : ''}
+                        {project ? ` • ${project.name}` : ''}
+                        {liveRuns.length > 0 ? ` • ${liveRuns.length} live run${liveRuns.length !== 1 ? 's' : ''}` : ''}
+                    </Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} flexShrink={0}>
+                    {agent.status === 'active' ? (
+                        <Button variant="outlined" size="small" sx={{ textTransform: 'none' }} onClick={() => handleStatusChange('paused')}>Pause</Button>
+                    ) : (
+                        <Button variant="contained" size="small" sx={{ textTransform: 'none' }} onClick={() => handleStatusChange('active')}>Activate</Button>
+                    )}
+                </Stack>
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Status" value={agent.status} caption="Current roster state" tone={agent.status === 'active' ? 'success' : agent.status === 'attention' ? 'warning' : 'neutral'} />
-                <AIStatCard label="Autonomy" value={agent.autonomyMode} caption={`${liveRuns.length} live run${liveRuns.length === 1 ? '' : 's'}`} tone="info" />
-                <AIStatCard label="Wakeups" value={String(openWakeups.length)} caption={`${relatedWakeups.length} total wakeups on record`} tone="warning" />
-                <AIStatCard label="Daily budget" value={formatUsd(microusdToUsd(agent.dailyBudgetMicrousd))} caption={`${relatedSessions.length} adapter session${relatedSessions.length === 1 ? '' : 's'} recorded`} tone="neutral" />
-            </AIStatGrid>
-
-            <AISectionGrid>
+            <Stack spacing={2}>
                 <AISectionCard eyebrow="Profile" title="Agent profile" description="Assignment, ownership, and control settings.">
                     <Stack spacing={1}>
                         <Typography variant="body2" sx={{ color: '#ffffff' }}>{agent.role}</Typography>
@@ -502,12 +506,15 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
                                 size="small"
                                 label="Adapter type"
                                 value={runtimeForm.adapterType}
-                                onChange={(event) => setRuntimeForm((current) => ({ ...current, adapterType: event.target.value }))}
-                                sx={{ minWidth: 180 }}
+                                onChange={(event) => {
+                                    setRuntimeForm((current) => ({ ...current, adapterType: event.target.value }));
+                                    setAdapterConfig({});
+                                }}
+                                sx={{ minWidth: 200 }}
                             >
                                 {runtimeAdapterOptions.map((option) => (
-                                    <MenuItem key={option} value={option}>
-                                        {humanizeRuntimeToken(option)}
+                                    <MenuItem key={option.value} value={option.value}>
+                                        {option.label}
                                     </MenuItem>
                                 ))}
                             </TextField>
@@ -547,26 +554,25 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
                             onChange={(event) => setRuntimeForm((current) => ({ ...current, cwd: event.target.value }))}
                             placeholder="/srv/timey/agents"
                         />
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.2}>
-                            <TextField
-                                size="small"
-                                label="Runtime config JSON"
-                                value={runtimeForm.configJson}
-                                onChange={(event) => setRuntimeForm((current) => ({ ...current, configJson: event.target.value }))}
-                                multiline
-                                minRows={3}
-                                fullWidth
+                        {runtimeForm.adapterType !== 'manual' && (
+                            <AdapterConfigForm
+                                adapterType={runtimeForm.adapterType as AdapterType}
+                                config={adapterConfig}
+                                onChange={setAdapterConfig}
+                                onSave={() => void doSaveRuntime()}
+                                saving={savingRuntime}
+                                disabled={!isOwner || currentOrgId == null}
                             />
-                            <TextField
-                                size="small"
-                                label="Environment JSON"
-                                value={runtimeForm.envJson}
-                                onChange={(event) => setRuntimeForm((current) => ({ ...current, envJson: event.target.value }))}
-                                multiline
-                                minRows={3}
-                                fullWidth
-                            />
-                        </Stack>
+                        )}
+                        <TextField
+                            size="small"
+                            label="Environment JSON"
+                            value={runtimeForm.envJson}
+                            onChange={(event) => setRuntimeForm((current) => ({ ...current, envJson: event.target.value }))}
+                            multiline
+                            minRows={3}
+                            fullWidth
+                        />
                         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.2}>
                             <TextField
                                 size="small"
@@ -714,7 +720,7 @@ export function AIAgentDetailPage({ agentId }: { agentId: string }) {
                     restoringRevisionId={restoringRevisionId}
                     canRestore={isOwner}
                 />
-            </AISectionGrid>
+            </Stack>
         </AIWorkspacePage>
     );
 }

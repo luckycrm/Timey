@@ -1,153 +1,191 @@
+import { useState } from 'react';
+import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
-import { formatBigIntDateTime, formatRelativeTime, NONE_U64 } from './aiUtils';
+import { AIWorkspacePage } from './AIPrimitives';
+import { formatRelativeTime } from './aiUtils';
 import { humanizeRuntimeToken } from './AIRuntimeDetailBlocks';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
+
+type FeedSource = 'all' | 'activity' | 'run_event';
+
+const SOURCE_TABS: { value: FeedSource; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'activity', label: 'Workspace events' },
+    { value: 'run_event', label: 'Run events' },
+];
 
 export function AIActivityPage() {
     const {
         aiActivities,
         aiAgents,
-        aiApprovals,
         aiRunEvents,
-        aiRuns,
-        aiTasks,
         usersById,
     } = useAIWorkspaceData();
 
+    const [tab, setTab] = useState<FeedSource>('all');
+    const [levelFilter, setLevelFilter] = useState<string>('all');
+
     const now = Date.now();
-    const recentActivity = [...aiActivities]
-        .sort((left, right) => Number(right.createdAt - left.createdAt));
-    const recentRunEvents = [...aiRunEvents]
-        .sort((left, right) => Number(right.createdAt - left.createdAt));
-    const combinedFeed = [
-        ...recentActivity.map((event) => ({
+
+    const activityRows = [...aiActivities]
+        .sort((l, r) => Number(r.createdAt - l.createdAt))
+        .map((event) => ({
             key: `activity-${event.id.toString()}`,
             createdAt: event.createdAt,
             source: 'activity' as const,
             title: event.description,
             subtitle: humanizeRuntimeToken(event.eventType),
             actorLabel: usersById.get(event.actorUserId)?.name || usersById.get(event.actorUserId)?.email || 'System',
-            agentName: aiAgents.find((row) => row.id === event.agentId)?.name || '',
-            rawPayload: event.metadataJson,
-        })),
-        ...recentRunEvents.map((event) => ({
+            agentName: aiAgents.find((a) => a.id === event.agentId)?.name || '',
+            level: '',
+        }));
+
+    const runEventRows = [...aiRunEvents]
+        .sort((l, r) => Number(r.createdAt - l.createdAt))
+        .map((event) => ({
             key: `run-event-${event.id.toString()}`,
             createdAt: event.createdAt,
             source: 'run_event' as const,
             title: event.message,
             subtitle: `${humanizeRuntimeToken(event.eventType)} • ${humanizeRuntimeToken(event.level)}`,
             actorLabel: usersById.get(event.actorUserId)?.name || usersById.get(event.actorUserId)?.email || 'Runtime',
-            agentName: aiAgents.find((row) => row.id === event.agentId)?.name || '',
-            rawPayload: event.payloadJson,
-        })),
-    ].sort((left, right) => Number(right.createdAt - left.createdAt));
+            agentName: aiAgents.find((a) => a.id === event.agentId)?.name || '',
+            level: event.level,
+        }));
 
-    const last24h = recentActivity.filter((event) => Number(event.createdAt) >= now - 24 * 60 * 60 * 1000);
-    const last24hRunEvents = recentRunEvents.filter((event) => Number(event.createdAt) >= now - 24 * 60 * 60 * 1000);
+    const combinedFeed = [...activityRows, ...runEventRows]
+        .sort((l, r) => Number(r.createdAt - l.createdAt));
+
+    const filtered = combinedFeed.filter((row) => {
+        if (tab !== 'all' && row.source !== tab) return false;
+        if (levelFilter !== 'all' && row.source === 'run_event' && row.level !== levelFilter) return false;
+        return true;
+    });
+
+    const levels = ['error', 'warning', 'info', 'debug'];
 
     return (
         <AIWorkspacePage page="activity">
-            <AIPageIntro
-                eyebrow="Activity"
-                title="Read the AI audit stream"
-                description="Every create, status change, approval decision, and run update writes into one activity feed. This page is the operator audit layer."
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Activity
+                </Typography>
+                <TextField
+                    select
+                    size="small"
+                    value={levelFilter}
+                    onChange={(e) => setLevelFilter(e.target.value)}
+                    sx={{
+                        minWidth: 120,
+                        '& .MuiInputBase-root': { fontSize: '0.8rem', color: '#555', borderColor: '#1a1a1a' },
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a1a' },
+                    }}
+                >
+                    <MenuItem value="all">All levels</MenuItem>
+                    {levels.map((l) => (
+                        <MenuItem key={l} value={l}>{l}</MenuItem>
+                    ))}
+                </TextField>
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Workspace events today" value={String(last24h.length)} caption="Across the last 24 hours" tone="info" />
-                <AIStatCard label="Run events today" value={String(last24hRunEvents.length)} caption={`${recentRunEvents.length} detailed run events recorded`} tone="success" />
-                <AIStatCard label="Approval events" value={String(recentActivity.filter((event) => event.approvalId !== NONE_U64).length)} caption={`${aiApprovals.filter((approval) => approval.status === 'pending').length} still pending`} tone="warning" />
-                <AIStatCard label="Task events" value={String(recentActivity.filter((event) => event.taskId !== NONE_U64).length)} caption={`${aiTasks.length} tasks currently tracked`} tone="neutral" />
-                <AIStatCard label="Runs tracked" value={String(aiRuns.length)} caption={`${recentActivity.filter((event) => event.runId !== NONE_U64).length} workspace activity rows mention a run`} tone="info" />
-            </AIStatGrid>
+            {/* Source tabs */}
+            <Stack direction="row" spacing={0} sx={{ borderBottom: '1px solid #1a1a1a', mt: -0.5 }}>
+                {SOURCE_TABS.map((t) => {
+                    const count = t.value === 'all' ? combinedFeed.length : t.value === 'activity' ? activityRows.length : runEventRows.length;
+                    return (
+                        <button
+                            key={t.value}
+                            onClick={() => setTab(t.value)}
+                            style={{
+                                padding: '6px 14px',
+                                border: 'none',
+                                background: 'none',
+                                cursor: 'pointer',
+                                color: tab === t.value ? '#ffffff' : '#555',
+                                borderBottom: tab === t.value ? '2px solid #ffffff' : '2px solid transparent',
+                                fontSize: '0.8rem',
+                                fontWeight: tab === t.value ? 600 : 400,
+                                transition: 'color 0.15s',
+                            }}
+                        >
+                            {t.label}
+                            {count > 0 && (
+                                <span style={{ marginLeft: 5, fontSize: '0.7rem', color: tab === t.value ? '#858585' : '#444' }}>
+                                    {count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </Stack>
 
-            <AISectionGrid>
-                <AISectionCard eyebrow="Feed" title="Combined operator feed" description="Workspace activity plus low-level run events, sorted into one timeline.">
-                    <Stack spacing={1.2}>
-                        {combinedFeed.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                No AI activity has been recorded yet.
-                            </Typography>
-                        ) : combinedFeed.slice(0, 14).map((event) => {
-                            return (
-                                <Stack
-                                    key={event.key}
-                                    direction={{ xs: 'column', md: 'row' }}
-                                    justifyContent="space-between"
-                                    spacing={1}
+            {/* Count */}
+            {filtered.length > 0 && (
+                <Typography variant="caption" sx={{ color: '#555' }}>
+                    {filtered.length} event{filtered.length !== 1 ? 's' : ''}
+                </Typography>
+            )}
+
+            {/* Feed */}
+            {filtered.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#555' }}>
+                        No activity recorded yet.
+                    </Typography>
+                </Box>
+            ) : (
+                <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                    {filtered.slice(0, 50).map((row) => (
+                        <Stack
+                            key={row.key}
+                            direction="row"
+                            alignItems="flex-start"
+                            spacing={2}
+                            sx={{
+                                px: 2,
+                                py: 1.5,
+                                borderBottom: '1px solid #1a1a1a',
+                                '&:last-child': { borderBottom: 'none' },
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                            }}
+                        >
+                            {/* Level dot for run events */}
+                            {row.source === 'run_event' && (
+                                <Box
                                     sx={{
-                                        px: 1.6,
-                                        py: 1.4,
-                                        borderRadius: '14px',
-                                        border: '1px solid #1a1a1a',
-                                        bgcolor: 'rgba(255,255,255,0.015)',
+                                        width: 7,
+                                        height: 7,
+                                        borderRadius: '50%',
+                                        mt: 0.75,
+                                        flexShrink: 0,
+                                        bgcolor:
+                                            row.level === 'error' ? '#ef4444' :
+                                            row.level === 'warning' ? '#f59e0b' :
+                                            row.level === 'info' ? '#7eb0ff' : '#333',
                                     }}
-                                >
-                                    <Stack spacing={0.45}>
-                                        <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                            {event.title}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                            {event.source === 'run_event' ? 'Run event' : 'Workspace event'} • {event.subtitle} • {event.actorLabel}{event.agentName ? ` • ${event.agentName}` : ''}
-                                        </Typography>
-                                        {event.rawPayload && event.rawPayload !== '{}' ? (
-                                            <Typography variant="caption" sx={{ color: '#666666' }}>
-                                                {event.rawPayload}
-                                            </Typography>
-                                        ) : null}
-                                    </Stack>
-                                    <Typography variant="caption" sx={{ color: '#666666' }}>
-                                        {formatRelativeTime(event.createdAt, now)}
-                                    </Typography>
-                                </Stack>
-                            );
-                        })}
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Patterns" title="Recent event mix" description="A quick read on what kind of activity the workspace is generating.">
-                    <Stack spacing={1.1}>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {recentActivity.filter((event) => event.eventType.includes('created')).length} creation events have been logged.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {recentActivity.filter((event) => event.eventType.includes('status') || event.eventType.includes('updated')).length} status or update events have been logged.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            {recentActivity.filter((event) => event.eventType.includes('approval')).length} approval-related events are in the feed.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            {recentRunEvents.filter((event) => event.level === 'error' || event.level === 'warning').length} run events were recorded at warning or error level.
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Attention" title="Watch items" description="Short guidance derived from the current feed and pending state.">
-                    <Stack spacing={1.1}>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {aiApprovals.filter((approval) => approval.status === 'pending').length} approvals are still waiting.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            {aiRuns.filter((run) => run.status === 'failed').length} runs have failed and may need retry logic.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            Last event at {recentActivity[0] ? formatBigIntDateTime(recentActivity[0].createdAt) : 'not available'}.
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Export" title="Audit posture" description="This feed is already structured enough to back exports later.">
-                    <Stack spacing={1}>
-                        <AIStatusPill label="Append-only events" tone="success" />
-                        <AIStatusPill label="Detailed run log rows" tone="info" />
-                        <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                            Reducers write coarse workspace activity rows and operators/runtime can append detailed run events. That gives the AI console a usable audit base before full Paperclip-style streaming logs land.
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-            </AISectionGrid>
+                                />
+                            )}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>
+                                    {row.title}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#858585', display: 'block', mt: 0.2 }}>
+                                    {row.source === 'run_event' ? 'Run event' : 'Workspace'} • {row.subtitle}
+                                    {row.actorLabel ? ` • ${row.actorLabel}` : ''}
+                                    {row.agentName ? ` • ${row.agentName}` : ''}
+                                </Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ color: '#555', flexShrink: 0 }}>
+                                {formatRelativeTime(row.createdAt, now)}
+                            </Typography>
+                        </Stack>
+                    ))}
+                </Box>
+            )}
         </AIWorkspacePage>
     );
 }

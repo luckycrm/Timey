@@ -1,18 +1,35 @@
 import { useState } from 'react';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import AiPriorityIcon from './AiPriorityIcon';
+import AiStatusBadge from './AiStatusBadge';
+import AiCommentThread from './AiCommentThread';
 import { Link } from '@tanstack/react-router';
-import { useReducer } from 'spacetimedb/tanstack';
+import { useReducer, useSpacetimeDB } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIWorkspacePage } from './AIPrimitives';
+import { AISectionCard, AIWorkspacePage } from './AIPrimitives';
 import { formatBigIntDateTime, formatRelativeTime, formatUsd, microusdToUsd, NONE_U64, safeParseBigInt } from './aiUtils';
 import { AIRuntimeListCard, humanizeRuntimeToken } from './AIRuntimeDetailBlocks';
 import { AILiveRunWidget } from './AILiveRunWidget';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
+
+const PRESET_COLORS = [
+    '#ef5350', // red
+    '#ff9800', // orange
+    '#fdd835', // yellow
+    '#66bb6a', // green
+    '#26c6da', // cyan
+    '#42a5f5', // blue
+    '#7e57c2', // purple
+    '#ec407a', // pink
+];
 
 const wakeupSourceOptions = ['manual', 'timer', 'assignment', 'automation'] as const;
 const runEventLevelOptions = ['info', 'warning', 'error', 'debug'] as const;
@@ -36,6 +53,9 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
         aiAdapterSessions,
         aiAgentRuntimeByAgentId,
         aiSettings,
+        aiLabels,
+        aiTaskLabels,
+        aiTaskComments,
     } = useAIWorkspaceData();
 
     const updateAiTaskStatus = useReducer(reducers.updateAiTaskStatus);
@@ -44,6 +64,13 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
     const updateAiRunStatus = useReducer(reducers.updateAiRunStatus);
     const enqueueAiWakeupRequest = useReducer(reducers.enqueueAiWakeupRequest);
     const appendAiRunEvent = useReducer(reducers.appendAiRunEvent);
+    const addAiTaskLabel = useReducer(reducers.addAiTaskLabel);
+    const removeAiTaskLabel = useReducer(reducers.removeAiTaskLabel);
+    const createAiLabel = useReducer(reducers.createAiLabel);
+    const addAiTaskComment = useReducer(reducers.addAiTaskComment);
+    const editAiTaskComment = useReducer(reducers.editAiTaskComment);
+    const deleteAiTaskComment = useReducer(reducers.deleteAiTaskComment);
+    const { identity } = useSpacetimeDB();
 
     const task = parsedId == null ? null : aiTasks.find((row) => row.id === parsedId) ?? null;
     const project = task ? aiProjects.find((row) => row.id === task.projectId) ?? null : null;
@@ -68,7 +95,6 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
             .filter((wakeup) => wakeup.taskId === task.id)
             .sort((left, right) => Number(right.createdAt - left.createdAt))
         : [];
-    const openWakeups = wakeups.filter((wakeup) => isWakeupOpen(wakeup.status));
     const runIds = new Set(runs.map((run) => run.id));
     const runEvents = task
         ? [...aiRunEvents]
@@ -93,6 +119,12 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
     });
     const [queueingWakeup, setQueueingWakeup] = useState(false);
     const [savingRunEvent, setSavingRunEvent] = useState(false);
+
+    // Labels UI state
+    const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
+    const [showCreateLabel, setShowCreateLabel] = useState(false);
+    const [newLabelName, setNewLabelName] = useState('');
+    const [newLabelColor, setNewLabelColor] = useState(PRESET_COLORS[0]);
 
     const wakeupItems = wakeups.slice(0, 8).map((wakeup) => ({
         key: wakeup.id.toString(),
@@ -267,53 +299,75 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
         }
     };
 
+    // Label derived data
+    const currentTaskLabelIds = new Set(
+        aiTaskLabels.filter((tl) => task != null && tl.taskId === task.id).map((tl) => tl.labelId)
+    );
+    const currentTaskLabelObjects = aiLabels.filter((label) => currentTaskLabelIds.has(label.id));
+    const availableToAdd = aiLabels.filter((label) => !currentTaskLabelIds.has(label.id));
+
+    const handleRemoveLabel = async (labelId: bigint) => {
+        if (!task) return;
+        await removeAiTaskLabel({ taskId: task.id, labelId });
+    };
+
+    const handleAddLabel = async (labelId: bigint) => {
+        if (!task) return;
+        await addAiTaskLabel({ taskId: task.id, labelId });
+        setLabelDropdownOpen(false);
+    };
+
+    const handleCreateLabel = async () => {
+        if (!newLabelName.trim() || !currentOrgId) return;
+        await createAiLabel({ orgId: currentOrgId, name: newLabelName.trim(), color: newLabelColor });
+        setNewLabelName('');
+        setNewLabelColor(PRESET_COLORS[0]);
+        setShowCreateLabel(false);
+        setLabelDropdownOpen(false);
+    };
+
     if (!task) {
         return (
             <AIWorkspacePage page="tasks">
-                <AIPageIntro
-                    eyebrow="Tasks"
-                    title="Task not found"
-                    description="The requested task does not exist in this workspace or the id is invalid."
-                    actionSlot={(
-                        <Button component={Link} to="/ai/tasks" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back to tasks
-                        </Button>
-                    )}
-                />
+                <Button component={Link} to="/ai/tasks" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0 }}>
+                    ← Tasks
+                </Button>
+                <Typography variant="body2" sx={{ color: '#555' }}>Task not found.</Typography>
             </AIWorkspacePage>
         );
     }
 
     return (
         <AIWorkspacePage page="tasks">
-            <AIPageIntro
-                eyebrow="Task detail"
-                title={task.title}
-                description={task.description || 'No task description yet.'}
-                supportingCopy={`${project?.name || 'No project'}${goal ? ` • ${goal.title}` : ''}${agent ? ` • ${agent.name}` : ''}`}
-                actionSlot={(
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} to="/ai/tasks" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back
-                        </Button>
-                        {task.status === 'queued' ? (
-                            <Button variant="contained" sx={{ textTransform: 'none' }} onClick={handleStart}>
-                                Start
-                            </Button>
-                        ) : null}
-                        {task.status === 'running' ? (
-                            <Button variant="contained" sx={{ textTransform: 'none' }} onClick={handleComplete}>
-                                Mark complete
-                            </Button>
-                        ) : null}
-                        {!approvals.some((approval) => approval.status === 'pending') && !['completed', 'cancelled'].includes(task.status) ? (
-                            <Button variant="outlined" sx={{ textTransform: 'none' }} onClick={handleRequestApproval}>
-                                Request approval
-                            </Button>
-                        ) : null}
-                    </Stack>
-                )}
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+                <Stack spacing={0.5}>
+                    <Button component={Link} to="/ai/tasks" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0, alignSelf: 'flex-start' }}>
+                        ← Tasks
+                    </Button>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>{task.title}</Typography>
+                    {task.description && (
+                        <Typography variant="body2" sx={{ color: '#858585' }}>{task.description}</Typography>
+                    )}
+                    <Typography variant="caption" sx={{ color: '#555' }}>
+                        {task.status} • {task.priority}
+                        {project ? ` • ${project.name}` : ''}
+                        {goal ? ` • ${goal.title}` : ''}
+                        {agent ? ` • ${agent.name}` : ''}
+                    </Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} flexShrink={0}>
+                    {(task.status === 'queued' || task.status === 'blocked' || task.status === 'failed') && (
+                        <Button variant="contained" size="small" sx={{ textTransform: 'none' }} onClick={handleStart}>Start</Button>
+                    )}
+                    {(task.status === 'running' || task.status === 'waiting_approval') && (
+                        <Button variant="contained" size="small" sx={{ textTransform: 'none' }} onClick={handleComplete}>Mark complete</Button>
+                    )}
+                    {!approvals.some((a) => a.status === 'pending') && !['completed', 'cancelled'].includes(task.status) && (
+                        <Button variant="outlined" size="small" sx={{ textTransform: 'none' }} onClick={handleRequestApproval}>Request approval</Button>
+                    )}
+                </Stack>
+            </Stack>
 
             <AILiveRunWidget
                 task={task}
@@ -347,14 +401,7 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
                 )}
             />
 
-            <AIStatGrid>
-                <AIStatCard label="Status" value={task.status} caption="Current workflow state" tone={task.status === 'completed' ? 'success' : task.status === 'blocked' || task.status === 'failed' ? 'warning' : 'info'} />
-                <AIStatCard label="Priority" value={task.priority} caption={`Due ${formatRelativeTime(task.dueAt)}`} tone={task.priority === 'urgent' || task.priority === 'high' ? 'warning' : 'neutral'} />
-                <AIStatCard label="Wakeups" value={String(openWakeups.length)} caption={`${wakeups.length} total wakeup records`} tone="warning" />
-                <AIStatCard label="Runs" value={String(runs.length)} caption={activeRun ? 'Active run in progress' : 'No active run'} tone="neutral" />
-            </AIStatGrid>
-
-            <AISectionGrid>
+            <Stack spacing={2}>
                 <AISectionCard eyebrow="Context" title="Linked records" description="Project, goal, and agent context for this task.">
                     <Stack spacing={1}>
                         <Typography variant="body2" sx={{ color: '#ffffff' }}>
@@ -509,11 +556,215 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
                 <AIRuntimeListCard
                     eyebrow="Events"
                     title="Run event timeline"
-                    description="Detailed execution and operator events recorded against this task’s runs."
+                    description="Detailed execution and operator events recorded against this task's runs."
                     items={eventItems}
                     emptyMessage="No runtime events have been recorded for this task yet."
                 />
-            </AISectionGrid>
+            </Stack>
+
+            {/* ── Priority & Status summary row ── */}
+            <Box sx={{ px: 0.5 }}>
+                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <AiStatusBadge status={task.status} />
+                    <AiPriorityIcon priority={task.priority} size={18} showTooltip />
+                    <Typography variant="caption" sx={{ color: '#858585' }}>
+                        {task.priority} priority
+                    </Typography>
+                </Stack>
+            </Box>
+
+            {/* ── Labels ── */}
+            <AISectionCard
+                eyebrow="Labels"
+                title="Task labels"
+                description="Labels help categorise and filter tasks across the board."
+            >
+                <Stack spacing={1.5}>
+                    {/* Current labels */}
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                        {currentTaskLabelObjects.length === 0 ? (
+                            <Typography variant="caption" sx={{ color: '#555555', fontStyle: 'italic' }}>
+                                No labels on this task yet.
+                            </Typography>
+                        ) : (
+                            currentTaskLabelObjects.map((label) => (
+                                <Chip
+                                    key={label.id.toString()}
+                                    label={label.name}
+                                    size="small"
+                                    onDelete={() => handleRemoveLabel(label.id)}
+                                    sx={{
+                                        bgcolor: label.color,
+                                        color: '#ffffff',
+                                        fontWeight: 600,
+                                        fontSize: '0.72rem',
+                                        '& .MuiChip-deleteIcon': { color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#ffffff' } },
+                                    }}
+                                />
+                            ))
+                        )}
+                    </Stack>
+
+                    {/* Add label / create label controls */}
+                    <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+                        {!labelDropdownOpen ? (
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                sx={{ textTransform: 'none', fontSize: '0.78rem' }}
+                                onClick={() => { setLabelDropdownOpen(true); setShowCreateLabel(false); }}
+                            >
+                                + Add label
+                            </Button>
+                        ) : (
+                            <Stack spacing={1} sx={{ minWidth: 220 }}>
+                                <Select
+                                    size="small"
+                                    displayEmpty
+                                    value=""
+                                    onChange={(e) => {
+                                        const val = e.target.value as string;
+                                        if (val === '__create__') {
+                                            setShowCreateLabel(true);
+                                        } else if (val) {
+                                            handleAddLabel(BigInt(val));
+                                        }
+                                    }}
+                                    renderValue={() => 'Select a label'}
+                                    sx={{ fontSize: '0.82rem' }}
+                                >
+                                    {availableToAdd.length === 0 && (
+                                        <MenuItem disabled value="">
+                                            <Typography variant="caption" sx={{ color: '#777777' }}>
+                                                No labels available
+                                            </Typography>
+                                        </MenuItem>
+                                    )}
+                                    {availableToAdd.map((label) => (
+                                        <MenuItem key={label.id.toString()} value={label.id.toString()}>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: label.color, flexShrink: 0 }} />
+                                                <Typography variant="body2">{label.name}</Typography>
+                                            </Stack>
+                                        </MenuItem>
+                                    ))}
+                                    <MenuItem value="__create__">
+                                        <Typography variant="body2" sx={{ color: '#42a5f5' }}>
+                                            + Create label
+                                        </Typography>
+                                    </MenuItem>
+                                </Select>
+                                <Button
+                                    size="small"
+                                    variant="text"
+                                    sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#666666', alignSelf: 'flex-start' }}
+                                    onClick={() => { setLabelDropdownOpen(false); setShowCreateLabel(false); }}
+                                >
+                                    Cancel
+                                </Button>
+                            </Stack>
+                        )}
+
+                        {/* Inline create label form */}
+                        {showCreateLabel && (
+                            <Stack
+                                spacing={1}
+                                sx={{
+                                    p: 1.5,
+                                    borderRadius: '10px',
+                                    border: '1px solid #1e1e1e',
+                                    bgcolor: 'rgba(255,255,255,0.03)',
+                                    minWidth: 260,
+                                }}
+                            >
+                                <Typography variant="caption" sx={{ color: '#aaaaaa', fontWeight: 600 }}>
+                                    New label
+                                </Typography>
+                                <TextField
+                                    size="small"
+                                    label="Label name"
+                                    value={newLabelName}
+                                    onChange={(e) => setNewLabelName(e.target.value)}
+                                    placeholder="e.g. needs-review"
+                                    autoFocus
+                                    sx={{ '& .MuiInputBase-input': { fontSize: '0.82rem' } }}
+                                />
+                                <Stack spacing={0.6}>
+                                    <Typography variant="caption" sx={{ color: '#777777' }}>
+                                        Color
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                                        {PRESET_COLORS.map((color) => (
+                                            <Box
+                                                key={color}
+                                                onClick={() => setNewLabelColor(color)}
+                                                sx={{
+                                                    width: 22,
+                                                    height: 22,
+                                                    borderRadius: '50%',
+                                                    bgcolor: color,
+                                                    cursor: 'pointer',
+                                                    border: newLabelColor === color ? '2px solid #ffffff' : '2px solid transparent',
+                                                    boxSizing: 'border-box',
+                                                    transition: 'border-color 0.15s',
+                                                }}
+                                            />
+                                        ))}
+                                    </Stack>
+                                </Stack>
+                                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                    <Button
+                                        size="small"
+                                        variant="text"
+                                        sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#666666' }}
+                                        onClick={() => { setShowCreateLabel(false); setNewLabelName(''); setNewLabelColor(PRESET_COLORS[0]); }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={!newLabelName.trim() || currentOrgId == null}
+                                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                        onClick={handleCreateLabel}
+                                    >
+                                        Create
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                        )}
+                    </Stack>
+                </Stack>
+            </AISectionCard>
+
+            {/* ── Comments ── */}
+            <AISectionCard
+                eyebrow="Discussion"
+                title="Comments"
+                description="Leave notes and updates for this task."
+            >
+                <AiCommentThread
+                    taskId={task.id}
+                    conn={{
+                        reducers: {
+                            addAiTaskComment: (args) => addAiTaskComment(args),
+                            editAiTaskComment: (args) => editAiTaskComment(args),
+                            deleteAiTaskComment: (args) => deleteAiTaskComment(args),
+                        },
+                    }}
+                    comments={aiTaskComments
+                        .filter((c) => c.taskId === task.id && !c.isDeleted)
+                        .map((c) => ({
+                            id: c.id,
+                            taskId: c.taskId,
+                            authorIdentity: c.authorIdentity.toHexString(),
+                            body: c.body,
+                            createdAt: c.createdAt.microsSinceUnixEpoch,
+                            updatedAt: c.updatedAt.microsSinceUnixEpoch,
+                        }))}
+                    currentIdentityHex={identity?.toHexString() ?? ''}
+                />
+            </AISectionCard>
         </AIWorkspacePage>
     );
 }

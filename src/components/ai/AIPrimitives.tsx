@@ -2,13 +2,13 @@ import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+import { ThemeProvider } from '@mui/material/styles';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { chatColors } from '../../theme/chatColors';
-import { appRadii } from '../../theme/radii';
+import { darkTheme } from '../../theme/theme';
 import { type AIPageKey } from './AIConfig';
 import { AISidebar } from './AISidebar';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
@@ -23,7 +23,7 @@ interface AIWorkspacePageProps {
 }
 
 interface AIPageIntroProps {
-    eyebrow: string;
+    eyebrow?: string;
     title: string;
     description: string;
     supportingCopy?: string;
@@ -32,7 +32,7 @@ interface AIPageIntroProps {
 
 interface AISectionCardProps {
     eyebrow?: string;
-    title: string;
+    title?: string;
     description?: string;
     actionSlot?: ReactNode;
     children: ReactNode;
@@ -66,33 +66,33 @@ interface AIProgressRowProps {
 
 const toneMap: Record<Tone, { border: string; text: string; soft: string; bar: string }> = {
     neutral: {
-        border: 'rgba(255,255,255,0.12)',
-        text: '#d5d5d5',
-        soft: 'rgba(255,255,255,0.05)',
+        border: '#1a1a1a',
+        text: '#858585',
+        soft: 'rgba(255,255,255,0.03)',
         bar: '#7d7d7d',
     },
     info: {
-        border: 'rgba(116,167,255,0.35)',
-        text: '#b9d1ff',
-        soft: 'rgba(116,167,255,0.12)',
+        border: '#1a1a1a',
+        text: '#7eb0ff',
+        soft: 'rgba(255,255,255,0.03)',
         bar: '#7eb0ff',
     },
     success: {
-        border: 'rgba(56,200,114,0.34)',
-        text: '#9de0b6',
-        soft: 'rgba(56,200,114,0.12)',
+        border: '#1a1a1a',
+        text: '#38c872',
+        soft: 'rgba(255,255,255,0.03)',
         bar: '#38c872',
     },
     warning: {
-        border: 'rgba(255,152,0,0.34)',
-        text: '#ffc47b',
-        soft: 'rgba(255,152,0,0.12)',
+        border: '#1a1a1a',
+        text: '#ff9800',
+        soft: 'rgba(255,255,255,0.03)',
         bar: '#ff9800',
     },
     danger: {
-        border: 'rgba(227,61,79,0.34)',
-        text: '#f5a3ad',
-        soft: 'rgba(227,61,79,0.12)',
+        border: '#1a1a1a',
+        text: '#e33d4f',
+        soft: 'rgba(255,255,255,0.03)',
         bar: '#e33d4f',
     },
 };
@@ -145,14 +145,15 @@ function AIWorkspacePageInner({
                 />
             }
         >
+            <ThemeProvider theme={darkTheme}>
             <Box sx={{ height: '100%', overflow: 'auto', bgcolor: chatColors.pageBg }}>
                 <Box
                     sx={{
                         px: { xs: 2, md: 3 },
-                        py: { xs: 2, md: 3 },
+                        py: { xs: 2, md: 2.5 },
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 2.5,
+                        gap: 2,
                     }}
                 >
                     {loading ? (
@@ -167,7 +168,6 @@ function AIWorkspacePageInner({
                         </Box>
                     ) : membershipUnavailable ? (
                         <AISectionCard
-                            eyebrow="Connection"
                             title="Workspace connection is not ready"
                             description="The AI workspace needs a live database connection before it can load org-scoped data."
                         >
@@ -178,7 +178,6 @@ function AIWorkspacePageInner({
                         </AISectionCard>
                     ) : currentOrgId == null ? (
                         <AISectionCard
-                            eyebrow="Workspace"
                             title="Join a workspace first"
                             description="AI controls are org-scoped. Create or join a workspace before using this area."
                         >
@@ -192,70 +191,40 @@ function AIWorkspacePageInner({
                     )}
                 </Box>
             </Box>
+            </ThemeProvider>
         </DashboardLayout>
     );
 }
 
 export function AIPageIntro({
-    eyebrow,
     title,
     description,
-    supportingCopy,
     actionSlot,
 }: AIPageIntroProps) {
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                p: { xs: 2.25, md: 2.75 },
-                borderRadius: appRadii.panel,
-                border: `1px solid ${chatColors.border}`,
-                bgcolor: chatColors.panelBg,
-                backgroundImage: 'linear-gradient(135deg, rgba(126,176,255,0.12), transparent 40%)',
-            }}
+        <Stack
+            direction="row"
+            alignItems="flex-start"
+            justifyContent="space-between"
+            spacing={2}
+            sx={{ mb: 0.5 }}
         >
-            <Stack
-                direction={{ xs: 'column', md: 'row' }}
-                spacing={2}
-                alignItems={{ xs: 'flex-start', md: 'flex-end' }}
-                justifyContent="space-between"
-            >
-                <Box sx={{ maxWidth: 760 }}>
-                    <Typography
-                        variant="caption"
-                        sx={{
-                            color: '#7eb0ff',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.12em',
-                        }}
-                    >
-                        {eyebrow}
-                    </Typography>
-                    <Typography
-                        variant="h4"
-                        sx={{
-                            color: chatColors.textPrimary,
-                            fontWeight: 700,
-                            letterSpacing: '-0.02em',
-                            mt: 0.8,
-                            mb: 1,
-                        }}
-                    >
-                        {title}
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: chatColors.textSecondary, lineHeight: 1.7 }}>
-                        {description}
-                    </Typography>
-                    {supportingCopy ? (
-                        <Typography variant="body2" sx={{ color: chatColors.textMuted, lineHeight: 1.7, mt: 1.2 }}>
-                            {supportingCopy}
-                        </Typography>
-                    ) : null}
-                </Box>
-                {actionSlot ? <Box sx={{ alignSelf: { xs: 'stretch', md: 'flex-end' } }}>{actionSlot}</Box> : null}
-            </Stack>
-        </Paper>
+            <Box>
+                <Typography
+                    variant="h6"
+                    sx={{ color: '#ffffff', fontWeight: 700, letterSpacing: '-0.01em' }}
+                >
+                    {title}
+                </Typography>
+                <Typography
+                    variant="body2"
+                    sx={{ color: '#858585', mt: 0.4, lineHeight: 1.6 }}
+                >
+                    {description}
+                </Typography>
+            </Box>
+            {actionSlot && <Box sx={{ flexShrink: 0 }}>{actionSlot}</Box>}
+        </Stack>
     );
 }
 
@@ -268,7 +237,7 @@ export function AISectionGrid({ children }: { children: ReactNode }) {
                     xs: '1fr',
                     md: 'repeat(2, minmax(0, 1fr))',
                 },
-                gap: 2,
+                gap: 1.5,
             }}
         >
             {children}
@@ -277,7 +246,6 @@ export function AISectionGrid({ children }: { children: ReactNode }) {
 }
 
 export function AISectionCard({
-    eyebrow,
     title,
     description,
     actionSlot,
@@ -285,46 +253,31 @@ export function AISectionCard({
     minHeight,
 }: AISectionCardProps) {
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                p: 2.25,
-                borderRadius: appRadii.panel,
-                border: `1px solid ${chatColors.border}`,
-                bgcolor: 'rgba(255,255,255,0.02)',
-                minHeight,
-            }}
-        >
-            <Stack spacing={2}>
-                <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
-                    <Box sx={{ minWidth: 0 }}>
-                        {eyebrow ? (
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: chatColors.textMuted,
-                                    fontWeight: 700,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.1em',
-                                }}
-                            >
-                                {eyebrow}
+        <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1, minHeight }}>
+            {(title || actionSlot) && (
+                <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ px: 2, py: 1.5, borderBottom: '1px solid #1a1a1a' }}
+                >
+                    <Box>
+                        {title && (
+                            <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
+                                {title}
                             </Typography>
-                        ) : null}
-                        <Typography variant="h6" sx={{ color: chatColors.textPrimary, fontWeight: 650, mt: eyebrow ? 0.5 : 0 }}>
-                            {title}
-                        </Typography>
-                        {description ? (
-                            <Typography variant="body2" sx={{ color: chatColors.textSecondary, lineHeight: 1.65, mt: 0.6 }}>
+                        )}
+                        {description && (
+                            <Typography variant="caption" sx={{ color: '#858585', display: 'block', mt: 0.2 }}>
                                 {description}
                             </Typography>
-                        ) : null}
+                        )}
                     </Box>
-                    {actionSlot ? <Box sx={{ flexShrink: 0 }}>{actionSlot}</Box> : null}
+                    {actionSlot && <Box>{actionSlot}</Box>}
                 </Stack>
-                {children}
-            </Stack>
-        </Paper>
+            )}
+            <Box sx={{ p: 2 }}>{children}</Box>
+        </Box>
     );
 }
 
@@ -337,7 +290,7 @@ export function AIStatGrid({ children }: { children: ReactNode }) {
                     xs: 'repeat(2, minmax(0, 1fr))',
                     lg: 'repeat(4, minmax(0, 1fr))',
                 },
-                gap: 1.5,
+                gap: 1,
             }}
         >
             {children}
@@ -346,32 +299,20 @@ export function AIStatGrid({ children }: { children: ReactNode }) {
 }
 
 export function AIStatCard({ label, value, caption, tone = 'neutral' }: AIStatCardProps) {
-    const palette = toneMap[tone];
-
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                p: 2,
-                borderRadius: appRadii.card,
-                border: `1px solid ${palette.border}`,
-                bgcolor: palette.soft,
-            }}
-        >
-            <Stack spacing={0.8}>
-                <Typography variant="caption" sx={{ color: chatColors.textSecondary, fontWeight: 600 }}>
-                    {label}
+        <Box sx={{ p: 1.5, border: '1px solid #1a1a1a', borderRadius: 1 }}>
+            <Typography variant="caption" sx={{ color: '#858585', fontWeight: 600, display: 'block' }}>
+                {label}
+            </Typography>
+            <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 700, my: 0.25 }}>
+                {value}
+            </Typography>
+            {caption && (
+                <Typography variant="caption" sx={{ color: toneMap[tone].text }}>
+                    {caption}
                 </Typography>
-                <Typography variant="h5" sx={{ color: chatColors.textPrimary, fontWeight: 700 }}>
-                    {value}
-                </Typography>
-                {caption ? (
-                    <Typography variant="body2" sx={{ color: palette.text, lineHeight: 1.5 }}>
-                        {caption}
-                    </Typography>
-                ) : null}
-            </Stack>
-        </Paper>
+            )}
+        </Box>
     );
 }
 
@@ -383,11 +324,13 @@ export function AIStatusPill({ label, tone = 'neutral' }: AIStatusPillProps) {
             size="small"
             label={label}
             sx={{
-                borderRadius: appRadii.badge,
+                borderRadius: '4px',
                 border: `1px solid ${palette.border}`,
                 bgcolor: palette.soft,
                 color: palette.text,
                 fontWeight: 600,
+                fontSize: '0.7rem',
+                height: 20,
             }}
         />
     );
@@ -401,13 +344,13 @@ export function AIInfoRow({ label, value, tone = 'neutral' }: AIInfoRowProps) {
             alignItems="center"
             justifyContent="space-between"
             sx={{
-                py: 1.1,
-                borderBottom: `1px solid ${chatColors.border}`,
+                py: 1,
+                borderBottom: `1px solid #1a1a1a`,
                 '&:last-of-type': { borderBottom: 'none', pb: 0 },
                 '&:first-of-type': { pt: 0 },
             }}
         >
-            <Typography variant="body2" sx={{ color: chatColors.textSecondary }}>
+            <Typography variant="body2" sx={{ color: '#858585' }}>
                 {label}
             </Typography>
             <AIStatusPill label={value} tone={tone} />
@@ -419,12 +362,12 @@ export function AIProgressRow({ label, value, detail, tone = 'info' }: AIProgres
     const palette = toneMap[tone];
 
     return (
-        <Stack spacing={0.9}>
+        <Stack spacing={0.75}>
             <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
-                <Typography variant="body2" sx={{ color: chatColors.textPrimary, fontWeight: 500 }}>
+                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 500 }}>
                     {label}
                 </Typography>
-                <Typography variant="caption" sx={{ color: chatColors.textSecondary, fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: '#858585', fontWeight: 600 }}>
                     {detail ?? `${value}%`}
                 </Typography>
             </Stack>
@@ -432,7 +375,7 @@ export function AIProgressRow({ label, value, detail, tone = 'info' }: AIProgres
                 variant="determinate"
                 value={value}
                 sx={{
-                    height: 7,
+                    height: 5,
                     borderRadius: 999,
                     bgcolor: 'rgba(255,255,255,0.06)',
                     '& .MuiLinearProgress-bar': {

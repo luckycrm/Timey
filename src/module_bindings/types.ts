@@ -132,6 +132,29 @@ export const AiGoal = __t.object("AiGoal", {
 });
 export type AiGoal = __Infer<typeof AiGoal>;
 
+export const AiLabel = __t.object("AiLabel", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  color: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type AiLabel = __Infer<typeof AiLabel>;
+
+export const AiLlmProvider = __t.object("AiLlmProvider", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  providerType: __t.string(),
+  apiKeySecretId: __t.u64(),
+  baseUrl: __t.string(),
+  modelId: __t.string(),
+  isDefault: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type AiLlmProvider = __Infer<typeof AiLlmProvider>;
+
 export const AiProject = __t.object("AiProject", {
   id: __t.u64(),
   orgId: __t.u64(),
@@ -179,6 +202,19 @@ export const AiRunEvent = __t.object("AiRunEvent", {
 });
 export type AiRunEvent = __Infer<typeof AiRunEvent>;
 
+export const AiSecret = __t.object("AiSecret", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  description: __t.string(),
+  valueEncrypted: __t.string(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  isDeleted: __t.bool(),
+});
+export type AiSecret = __Infer<typeof AiSecret>;
+
 export const AiTask = __t.object("AiTask", {
   id: __t.u64(),
   orgId: __t.u64(),
@@ -199,6 +235,39 @@ export const AiTask = __t.object("AiTask", {
   updatedAt: __t.u64(),
 });
 export type AiTask = __Infer<typeof AiTask>;
+
+export const AiTaskAttachment = __t.object("AiTaskAttachment", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  orgId: __t.u64(),
+  uploaderIdentity: __t.identity(),
+  filename: __t.string(),
+  url: __t.string(),
+  mimeType: __t.string(),
+  sizeBytes: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type AiTaskAttachment = __Infer<typeof AiTaskAttachment>;
+
+export const AiTaskComment = __t.object("AiTaskComment", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  orgId: __t.u64(),
+  authorIdentity: __t.identity(),
+  body: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  isDeleted: __t.bool(),
+});
+export type AiTaskComment = __Infer<typeof AiTaskComment>;
+
+export const AiTaskLabel = __t.object("AiTaskLabel", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  labelId: __t.u64(),
+  addedAt: __t.timestamp(),
+});
+export type AiTaskLabel = __Infer<typeof AiTaskLabel>;
 
 export const AiWakeupRequest = __t.object("AiWakeupRequest", {
   id: __t.u64(),

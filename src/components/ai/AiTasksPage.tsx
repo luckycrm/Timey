@@ -1,17 +1,39 @@
 import { useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import ViewKanbanIcon from '@mui/icons-material/ViewKanban';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import AddIcon from '@mui/icons-material/Add';
+import AiKanbanBoard from './AiKanbanBoard';
 import { useReducer } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
-import { formatBigIntDateTime, formatRelativeTime, NONE_U64 } from './aiUtils';
+import { AIWorkspacePage } from './AIPrimitives';
+import { formatRelativeTime, NONE_U64 } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 const priorityOptions = ['low', 'normal', 'high', 'urgent'] as const;
+
+type TaskTab = 'all' | 'open' | 'running' | 'blocked' | 'done';
+
+const TABS: { value: TaskTab; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'open', label: 'Open' },
+    { value: 'running', label: 'Running' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'done', label: 'Done' },
+];
 
 export function AITasksPage() {
     const {
@@ -22,7 +44,6 @@ export function AITasksPage() {
         aiGoals,
         aiAgents,
         aiApprovals,
-        aiRunEvents,
         aiRuns,
         aiWakeupRequests,
     } = useAIWorkspaceData();
@@ -43,6 +64,9 @@ export function AITasksPage() {
         dueAt: '',
     });
     const [submitting, setSubmitting] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+    const [tab, setTab] = useState<TaskTab>('all');
 
     const tasksWithContext = useMemo(() => {
         const sorted = [...aiTasks].sort((left, right) => {
@@ -64,20 +88,32 @@ export function AITasksPage() {
                 .sort((left, right) => Number(right.createdAt - left.createdAt))
                 .find((run) => run.status === 'running' || run.status === 'waiting_approval') ?? null,
             openWakeups: aiWakeupRequests.filter((wakeup) => wakeup.taskId === task.id && ['queued', 'claimed', 'running'].includes(wakeup.status)),
-            runEvents: aiRunEvents.filter((event) => event.taskId === task.id),
             activeSessions: aiAdapterSessions.filter((session) => (
                 session.status === 'active' &&
                 session.runId !== NONE_U64 &&
                 aiRuns.some((run) => run.id === session.runId && run.taskId === task.id)
             )),
         }));
-    }, [aiAdapterSessions, aiAgents, aiApprovals, aiGoals, aiProjects, aiRunEvents, aiRuns, aiTasks, aiWakeupRequests]);
+    }, [aiAdapterSessions, aiAgents, aiApprovals, aiGoals, aiProjects, aiRuns, aiTasks, aiWakeupRequests]);
 
-    const openTasks = aiTasks.filter((task) => !['completed', 'cancelled', 'failed'].includes(task.status));
-    const inMotion = aiTasks.filter((task) => task.status === 'running');
-    const blocked = aiTasks.filter((task) => task.status === 'blocked' || task.status === 'failed');
-    const humanHandoffs = aiTasks.filter((task) => task.status === 'waiting_approval');
-    const openWakeups = aiWakeupRequests.filter((wakeup) => ['queued', 'claimed', 'running'].includes(wakeup.status));
+    const filteredTasks = useMemo(() => {
+        return tasksWithContext.filter(({ task }) => {
+            if (tab === 'open') return !['completed', 'cancelled', 'failed'].includes(task.status);
+            if (tab === 'running') return task.status === 'running';
+            if (tab === 'blocked') return task.status === 'blocked' || task.status === 'failed' || task.status === 'waiting_approval';
+            if (tab === 'done') return task.status === 'completed' || task.status === 'cancelled';
+            return true;
+        });
+    }, [tasksWithContext, tab]);
+
+    const tabCount = (t: TaskTab) => {
+        if (t === 'all') return aiTasks.length;
+        if (t === 'open') return aiTasks.filter((task) => !['completed', 'cancelled', 'failed'].includes(task.status)).length;
+        if (t === 'running') return aiTasks.filter((task) => task.status === 'running').length;
+        if (t === 'blocked') return aiTasks.filter((task) => ['blocked', 'failed', 'waiting_approval'].includes(task.status)).length;
+        if (t === 'done') return aiTasks.filter((task) => ['completed', 'cancelled'].includes(task.status)).length;
+        return 0;
+    };
 
     const handleCreateTask = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -108,6 +144,7 @@ export function AITasksPage() {
                 dueAt: '',
             });
             toast.success('Task created');
+            setCreateOpen(false);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to create task');
         } finally {
@@ -188,126 +225,265 @@ export function AITasksPage() {
         }
     };
 
+    const priorityColor = (p: string) =>
+        p === 'urgent' ? '#e33d4f' : p === 'high' ? '#ff9800' : '#555';
+
+    const statusColor = (s: string) =>
+        s === 'running' ? '#38c872' :
+        s === 'waiting_approval' || s === 'blocked' || s === 'failed' ? '#ff9800' :
+        s === 'completed' ? '#555' : '#444';
+
     return (
         <AIWorkspacePage page="tasks">
-            <AIPageIntro
-                eyebrow="Tasks"
-                title="Track execution as live work"
-                description="Tasks are now real AI workspace records. This page shows what is queued, what is moving, and where a human still needs to step in."
-            />
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Tasks
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <ToggleButtonGroup
+                        value={viewMode}
+                        exclusive
+                        onChange={(_, next) => { if (next) setViewMode(next); }}
+                        size="small"
+                        sx={{
+                            '& .MuiToggleButton-root': {
+                                color: '#444',
+                                borderColor: '#1a1a1a',
+                                textTransform: 'none',
+                                px: 1.2,
+                                py: 0.5,
+                                fontSize: '0.75rem',
+                                '&.Mui-selected': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+                            },
+                        }}
+                    >
+                        <ToggleButton value="list" aria-label="List view">
+                            <ViewListIcon sx={{ fontSize: 15, mr: 0.5 }} />
+                            List
+                        </ToggleButton>
+                        <ToggleButton value="kanban" aria-label="Kanban view">
+                            <ViewKanbanIcon sx={{ fontSize: 15, mr: 0.5 }} />
+                            Kanban
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+                        onClick={() => setCreateOpen(true)}
+                        sx={{
+                            textTransform: 'none',
+                            fontSize: '0.8rem',
+                            borderColor: '#1a1a1a',
+                            color: '#858585',
+                            '&:hover': { borderColor: '#333', color: '#fff', bgcolor: 'transparent' },
+                        }}
+                    >
+                        New Task
+                    </Button>
+                </Stack>
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Open tasks" value={String(openTasks.length)} caption="Not completed or cancelled" tone="info" />
-                <AIStatCard label="In motion" value={String(inMotion.length)} caption="Currently running" tone="success" />
-                <AIStatCard label="Blocked" value={String(blocked.length)} caption="Failed or blocked tasks" tone="warning" />
-                <AIStatCard label="Human handoffs" value={String(humanHandoffs.length)} caption="Waiting on approval" tone="danger" />
-                <AIStatCard label="Wakeups live" value={String(openWakeups.length)} caption={`${aiRunEvents.length} run events logged`} tone="info" />
-            </AIStatGrid>
-
-            <AISectionGrid>
-                <AISectionCard
-                    eyebrow="Queue"
-                    title="Priority queue"
-                    description="Sorted by priority first, then by oldest work."
-                >
-                    <Stack spacing={1.2}>
-                        {tasksWithContext.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                No tasks yet. Create one on the right to start the execution queue.
-                            </Typography>
-                        ) : tasksWithContext.slice(0, 8).map(({ task, agent, project, goal, pendingApproval, activeRun, openWakeups, runEvents, activeSessions }) => (
-                            <Stack
-                                key={task.id.toString()}
-                                spacing={1}
-                                sx={{
-                                    px: 1.6,
-                                    py: 1.4,
-                                    borderRadius: '14px',
-                                    border: '1px solid #1a1a1a',
-                                    bgcolor: 'rgba(255,255,255,0.015)',
+            {viewMode === 'kanban' ? (
+                <Box sx={{ mt: 0.5 }}>
+                    <AiKanbanBoard
+                        tasks={aiTasks}
+                        onTaskClick={(id) => { window.location.href = `/ai/tasks/${id.toString()}`; }}
+                        agentNames={new Map(aiAgents.map((a) => [a.id, a.name]))}
+                    />
+                </Box>
+            ) : (
+                <>
+                    {/* Tabs */}
+                    <Stack direction="row" spacing={0} sx={{ borderBottom: '1px solid #1a1a1a', mt: -0.5 }}>
+                        {TABS.map((t) => (
+                            <button
+                                key={t.value}
+                                onClick={() => setTab(t.value)}
+                                style={{
+                                    padding: '6px 14px',
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: 'pointer',
+                                    color: tab === t.value ? '#ffffff' : '#555',
+                                    borderBottom: tab === t.value ? '2px solid #ffffff' : '2px solid transparent',
+                                    fontSize: '0.8rem',
+                                    fontWeight: tab === t.value ? 600 : 400,
+                                    transition: 'color 0.15s',
                                 }}
                             >
-                                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
-                                    <Stack spacing={0.5}>
+                                {t.label}
+                                {tabCount(t.value) > 0 && (
+                                    <span style={{ marginLeft: 5, fontSize: '0.7rem', color: tab === t.value ? '#858585' : '#444' }}>
+                                        {tabCount(t.value)}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </Stack>
+
+                    {/* Count */}
+                    {filteredTasks.length > 0 && (
+                        <Typography variant="caption" sx={{ color: '#555' }}>
+                            {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
+                        </Typography>
+                    )}
+
+                    {/* Task list */}
+                    {aiTasks.length === 0 ? (
+                        <Box sx={{ py: 8, textAlign: 'center' }}>
+                            <Typography variant="body2" sx={{ color: '#555' }}>No tasks yet.</Typography>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={{ mt: 2, textTransform: 'none', borderColor: '#1a1a1a', color: '#858585', '&:hover': { borderColor: '#333', color: '#fff', bgcolor: 'transparent' } }}
+                                onClick={() => setCreateOpen(true)}
+                            >
+                                Create your first task
+                            </Button>
+                        </Box>
+                    ) : filteredTasks.length === 0 ? (
+                        <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                            <Box sx={{ py: 6, textAlign: 'center' }}>
+                                <Typography variant="body2" sx={{ color: '#555' }}>No tasks match this filter.</Typography>
+                            </Box>
+                        </Box>
+                    ) : (
+                        <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                            {filteredTasks.map(({ task, agent, project, goal, pendingApproval, activeRun }) => (
+                                <Stack
+                                    key={task.id.toString()}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={2}
+                                    sx={{
+                                        px: 2,
+                                        py: 1.5,
+                                        borderBottom: '1px solid #1a1a1a',
+                                        '&:last-child': { borderBottom: 'none' },
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                    }}
+                                >
+                                    {/* Status dot */}
+                                    <Box
+                                        sx={{
+                                            width: 7,
+                                            height: 7,
+                                            borderRadius: '50%',
+                                            bgcolor: statusColor(task.status),
+                                            flexShrink: 0,
+                                        }}
+                                    />
+
+                                    {/* Name + meta */}
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
                                             {task.title}
                                         </Typography>
-                                        <Typography variant="caption" sx={{ color: '#858585' }}>
-                                            {project?.name || 'No project'} • {goal?.title || 'No goal'} • {agent?.name || 'No agent assigned'}
+                                        <Typography variant="caption" sx={{ color: '#555' }}>
+                                            {project?.name || 'No project'}
+                                            {goal ? ` • ${goal.title}` : ''}
+                                            {agent ? ` • ${agent.name}` : ''}
+                                            {task.dueAt && task.dueAt > 0n ? ` • due ${formatRelativeTime(task.dueAt)}` : ''}
                                         </Typography>
-                                        <Typography variant="caption" sx={{ color: '#666666' }}>
-                                            Due {formatRelativeTime(task.dueAt)} • Created {formatBigIntDateTime(task.createdAt)}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#666666' }}>
-                                            {openWakeups.length} live wakeup{openWakeups.length === 1 ? '' : 's'} • {runEvents.length} run event{runEvents.length === 1 ? '' : 's'} • {activeSessions.length} active session{activeSessions.length === 1 ? '' : 's'}
-                                        </Typography>
-                                    </Stack>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <AIStatusPill
-                                            label={task.status}
-                                            tone={
-                                                task.status === 'completed'
-                                                    ? 'success'
-                                                    : task.status === 'waiting_approval'
-                                                      ? 'danger'
-                                                      : task.status === 'blocked' || task.status === 'failed'
-                                                        ? 'warning'
-                                                        : 'info'
-                                            }
-                                        />
-                                        <AIStatusPill label={task.priority} tone={task.priority === 'urgent' || task.priority === 'high' ? 'warning' : 'neutral'} />
-                                    </Stack>
-                                </Stack>
-                                <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                    {task.description || 'No task description yet.'}
-                                </Typography>
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        href={`/ai/tasks/${task.id.toString()}`}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        Details
-                                    </Button>
-                                    {task.status === 'queued' ? (
-                                        <Button size="small" variant="outlined" sx={{ textTransform: 'none' }} onClick={() => handleStartTask(task.id, task.agentId)}>
-                                            Start
-                                        </Button>
-                                    ) : null}
-                                    {task.status === 'running' ? (
-                                        <Button size="small" variant="outlined" sx={{ textTransform: 'none' }} onClick={() => handleCompleteTask(task.id, activeRun?.id ?? null)}>
-                                            Mark complete
-                                        </Button>
-                                    ) : null}
-                                    {!pendingApproval && !['waiting_approval', 'completed', 'cancelled'].includes(task.status) ? (
-                                        <Button size="small" variant="outlined" sx={{ textTransform: 'none' }} onClick={() => handleRequestApproval(task.id, task.agentId, task.title)}>
-                                            Request approval
-                                        </Button>
-                                    ) : null}
-                                    {pendingApproval ? (
-                                        <Typography variant="caption" sx={{ color: '#ffc47b' }}>
-                                            Approval request is already pending.
-                                        </Typography>
-                                    ) : null}
-                                </Stack>
-                            </Stack>
-                        ))}
-                    </Stack>
-                </AISectionCard>
+                                    </Box>
 
-                <AISectionCard
-                    eyebrow="Create"
-                    title="Add a task"
-                    description="Tasks are the work tickets agents and reviewers act on."
-                >
-                    <Stack component="form" spacing={1.4} onSubmit={handleCreateTask}>
+                                    {/* Right */}
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                                        <Chip
+                                            size="small"
+                                            label={task.priority}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                height: 20,
+                                                bgcolor: 'transparent',
+                                                color: priorityColor(task.priority),
+                                                border: '1px solid #1a1a1a',
+                                                borderRadius: '4px',
+                                            }}
+                                        />
+                                        <Chip
+                                            size="small"
+                                            label={task.status.replace(/_/g, ' ')}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                height: 20,
+                                                bgcolor: 'transparent',
+                                                color: '#555',
+                                                border: '1px solid #1a1a1a',
+                                                borderRadius: '4px',
+                                            }}
+                                        />
+                                        {task.status === 'queued' && (
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                                onClick={() => handleStartTask(task.id, task.agentId)}
+                                            >
+                                                Start
+                                            </Button>
+                                        )}
+                                        {task.status === 'running' && (
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                                onClick={() => handleCompleteTask(task.id, activeRun?.id ?? null)}
+                                            >
+                                                Complete
+                                            </Button>
+                                        )}
+                                        {!pendingApproval && !['waiting_approval', 'completed', 'cancelled'].includes(task.status) && (
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1 }}
+                                                onClick={() => handleRequestApproval(task.id, task.agentId, task.title)}
+                                            >
+                                                Approve?
+                                            </Button>
+                                        )}
+                                        <Button
+                                            component="a"
+                                            href={`/ai/tasks/${task.id.toString()}`}
+                                            size="small"
+                                            variant="text"
+                                            sx={{ textTransform: 'none', color: '#555', fontSize: '0.75rem', minWidth: 0, px: 1, '&:hover': { color: '#fff' } }}
+                                        >
+                                            Details →
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            ))}
+                        </Box>
+                    )}
+                </>
+            )}
+
+            {/* Create Task Dialog */}
+            <Dialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{ sx: { bgcolor: '#111111', border: '1px solid #1a1a1a', borderRadius: '8px' } }}
+            >
+                <DialogTitle sx={{ pb: 1 }}>
+                    <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
+                        New Task
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 1 }}>
+                    <Stack component="form" spacing={1.4} id="create-task-form" onSubmit={handleCreateTask}>
                         <TextField
                             size="small"
                             label="Task title"
                             value={form.title}
                             onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                             placeholder="Draft proposal for Northwind renewal"
+                            autoFocus
                         />
                         <TextField
                             size="small"
@@ -325,7 +501,7 @@ export function AITasksPage() {
                                 label="Project"
                                 value={form.projectId}
                                 onChange={(event) => setForm((current) => ({ ...current, projectId: event.target.value }))}
-                                sx={{ minWidth: 180 }}
+                                sx={{ flex: 1 }}
                             >
                                 <MenuItem value="0">No project</MenuItem>
                                 {aiProjects.map((project) => (
@@ -340,7 +516,7 @@ export function AITasksPage() {
                                 label="Goal"
                                 value={form.goalId}
                                 onChange={(event) => setForm((current) => ({ ...current, goalId: event.target.value }))}
-                                sx={{ minWidth: 180 }}
+                                sx={{ flex: 1 }}
                             >
                                 <MenuItem value="0">No goal</MenuItem>
                                 {aiGoals.map((goal) => (
@@ -355,7 +531,7 @@ export function AITasksPage() {
                                 label="Agent"
                                 value={form.agentId}
                                 onChange={(event) => setForm((current) => ({ ...current, agentId: event.target.value }))}
-                                sx={{ minWidth: 180 }}
+                                sx={{ flex: 1 }}
                             >
                                 <MenuItem value="0">Unassigned</MenuItem>
                                 {aiAgents.map((agent) => (
@@ -372,7 +548,7 @@ export function AITasksPage() {
                                 label="Priority"
                                 value={form.priority}
                                 onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))}
-                                sx={{ minWidth: 160 }}
+                                sx={{ flex: 1 }}
                             >
                                 {priorityOptions.map((option) => (
                                     <MenuItem key={option} value={option}>
@@ -387,61 +563,30 @@ export function AITasksPage() {
                                 value={form.dueAt}
                                 onChange={(event) => setForm((current) => ({ ...current, dueAt: event.target.value }))}
                                 InputLabelProps={{ shrink: true }}
-                                sx={{ minWidth: 220 }}
+                                sx={{ flex: 1 }}
                             />
                         </Stack>
-                        <Stack direction="row" justifyContent="flex-end">
-                            <Button type="submit" variant="contained" disabled={submitting || currentOrgId == null} sx={{ textTransform: 'none' }}>
-                                {submitting ? 'Creating...' : 'Create task'}
-                            </Button>
-                        </Stack>
                     </Stack>
-                </AISectionCard>
-
-                <AISectionCard
-                    eyebrow="Handoffs"
-                    title="Waiting on people"
-                    description="Tasks and approvals that still need human release."
-                >
-                    <Stack spacing={1.1}>
-                        {humanHandoffs.length === 0 && aiApprovals.filter((approval) => approval.status === 'pending').length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                                No human handoffs are waiting right now.
-                            </Typography>
-                        ) : (
-                            <>
-                                <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                                    {humanHandoffs.length} tasks are waiting on approval.
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                                    {aiApprovals.filter((approval) => approval.status === 'pending').length} approval records are still pending.
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#858585' }}>
-                                    Use the Approvals page to decide which tasks can move again.
-                                </Typography>
-                            </>
-                        )}
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard
-                    eyebrow="Policy"
-                    title="Current execution boundaries"
-                    description="Keep the first version explicit while the runtime stays approval-gated."
-                >
-                    <Stack spacing={1.1}>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            New tasks enter the queue immediately, but external actions should still request approval.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            Runs and spend tracking can be added later without changing this task model.
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            The safest workflow right now is: create task, assign agent, request approval if needed, then mark complete.
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-            </AISectionGrid>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #1a1a1a' }}>
+                    <Button
+                        variant="text"
+                        onClick={() => setCreateOpen(false)}
+                        sx={{ textTransform: 'none', color: '#555' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="create-task-form"
+                        variant="contained"
+                        disabled={submitting || currentOrgId == null || !form.title.trim()}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        {submitting ? 'Creating...' : 'Create task'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </AIWorkspacePage>
     );
 }

@@ -5,33 +5,25 @@ import { Link } from '@tanstack/react-router';
 import { useReducer } from 'spacetimedb/tanstack';
 import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
-import { AIPageIntro, AISectionCard, AISectionGrid, AIStatCard, AIStatGrid, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
+import { AISectionCard, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
 import { formatBigIntDateTime, NONE_U64, safeParseBigInt } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 export function AIApprovalDetailPage({ approvalId }: { approvalId: string }) {
     const parsedId = safeParseBigInt(approvalId);
-    const {
-        aiApprovals,
-        aiTasks,
-        aiAgents,
-        usersById,
-        aiActivities,
-    } = useAIWorkspaceData();
+    const { aiApprovals, aiTasks, aiAgents, usersById, aiActivities } = useAIWorkspaceData();
 
     const decideAiApproval = useReducer(reducers.decideAiApproval);
 
-    const approval = parsedId == null ? null : aiApprovals.find((row) => row.id === parsedId) ?? null;
-    const task = approval ? aiTasks.find((row) => row.id === approval.taskId) ?? null : null;
-    const agent = approval ? aiAgents.find((row) => row.id === approval.agentId) ?? null : null;
+    const approval = parsedId == null ? null : aiApprovals.find((r) => r.id === parsedId) ?? null;
+    const task = approval ? aiTasks.find((r) => r.id === approval.taskId) ?? null : null;
+    const agent = approval ? aiAgents.find((r) => r.id === approval.agentId) ?? null : null;
     const requester = approval ? usersById.get(approval.requesterUserId) ?? null : null;
     const reviewer = approval && approval.reviewerUserId !== NONE_U64
         ? usersById.get(approval.reviewerUserId) ?? null
         : null;
     const relatedEvents = approval
-        ? [...aiActivities]
-            .filter((event) => event.approvalId === approval.id)
-            .sort((left, right) => Number(right.createdAt - left.createdAt))
+        ? [...aiActivities].filter((e) => e.approvalId === approval.id).sort((a, b) => Number(b.createdAt - a.createdAt))
         : [];
 
     const handleDecision = async (status: 'approved' | 'rejected') => {
@@ -47,100 +39,78 @@ export function AIApprovalDetailPage({ approvalId }: { approvalId: string }) {
     if (!approval) {
         return (
             <AIWorkspacePage page="approvals">
-                <AIPageIntro
-                    eyebrow="Approvals"
-                    title="Approval not found"
-                    description="The requested approval does not exist in this workspace or the id is invalid."
-                    actionSlot={
-                        <Button component={Link} to="/ai/approvals" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back to approvals
-                        </Button>
-                    }
-                />
+                <Button component={Link} to="/ai/approvals" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0 }}>
+                    ← Approvals
+                </Button>
+                <Typography variant="body2" sx={{ color: '#555' }}>Approval not found.</Typography>
             </AIWorkspacePage>
         );
     }
 
+    const statusTone = approval.status === 'approved' ? 'success' : approval.status === 'rejected' ? 'danger' : 'warning';
+    const riskTone = approval.riskLevel === 'high' || approval.riskLevel === 'critical' ? 'danger' : approval.riskLevel === 'medium' ? 'warning' : 'info';
+
     return (
         <AIWorkspacePage page="approvals">
-            <AIPageIntro
-                eyebrow="Approval detail"
-                title={approval.title}
-                description={approval.summary || 'No summary provided.'}
-                supportingCopy={`${task?.title || 'No linked task'}${agent ? ` • ${agent.name}` : ''}`}
-                actionSlot={
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} to="/ai/approvals" variant="outlined" sx={{ textTransform: 'none' }}>
-                            Back
+            {/* Header */}
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+                <Stack spacing={0.5}>
+                    <Button component={Link} to="/ai/approvals" variant="text" size="small" sx={{ textTransform: 'none', color: '#555', minWidth: 0, px: 0, alignSelf: 'flex-start' }}>
+                        ← Approvals
+                    </Button>
+                    <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>{approval.title}</Typography>
+                        <AIStatusPill label={approval.status} tone={statusTone} />
+                        <AIStatusPill label={approval.riskLevel} tone={riskTone} />
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: '#555' }}>
+                        {task ? task.title : 'No linked task'}
+                        {agent ? ` • ${agent.name}` : ''}
+                        {requester ? ` • requested by ${requester.name || requester.email}` : ''}
+                        {` • ${formatBigIntDateTime(approval.createdAt)}`}
+                    </Typography>
+                </Stack>
+                {approval.status === 'pending' && (
+                    <Stack direction="row" spacing={1} flexShrink={0}>
+                        <Button variant="contained" size="small" sx={{ textTransform: 'none' }} onClick={() => handleDecision('approved')}>
+                            Approve
                         </Button>
-                        {approval.status === 'pending' ? (
-                            <>
-                                <Button variant="contained" sx={{ textTransform: 'none' }} onClick={() => handleDecision('approved')}>
-                                    Approve
-                                </Button>
-                                <Button variant="outlined" color="error" sx={{ textTransform: 'none' }} onClick={() => handleDecision('rejected')}>
-                                    Reject
-                                </Button>
-                            </>
-                        ) : null}
+                        <Button variant="outlined" color="error" size="small" sx={{ textTransform: 'none' }} onClick={() => handleDecision('rejected')}>
+                            Reject
+                        </Button>
                     </Stack>
-                }
-            />
+                )}
+            </Stack>
 
-            <AIStatGrid>
-                <AIStatCard label="Status" value={approval.status} caption="Current approval state" tone={approval.status === 'approved' ? 'success' : approval.status === 'rejected' ? 'danger' : 'warning'} />
-                <AIStatCard label="Risk" value={approval.riskLevel} caption="Declared review level" tone={approval.riskLevel === 'high' || approval.riskLevel === 'critical' ? 'danger' : approval.riskLevel === 'medium' ? 'warning' : 'info'} />
-                <AIStatCard label="Requester" value={requester?.name || requester?.email || 'Unknown'} caption="Who requested this action" tone="neutral" />
-                <AIStatCard label="Reviewer" value={reviewer?.name || reviewer?.email || (approval.status === 'pending' ? 'Waiting' : 'Unknown')} caption="Who closed the approval" tone="info" />
-            </AIStatGrid>
+            {/* Summary */}
+            {approval.summary && (
+                <Typography variant="body2" sx={{ color: '#858585' }}>{approval.summary}</Typography>
+            )}
 
-            <AISectionGrid>
-                <AISectionCard eyebrow="Context" title="Linked work" description="Task and agent context for this approval.">
-                    <Stack spacing={1}>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            Task: {task?.title || 'Not linked'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#ffffff' }}>
-                            Agent: {agent?.name || 'Not linked'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#858585' }}>
-                            Requested {formatBigIntDateTime(approval.createdAt)}
-                            {approval.decidedAt !== NONE_U64 ? ` • Decided ${formatBigIntDateTime(approval.decidedAt)}` : ''}
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
+            {/* Decision state */}
+            <Typography variant="body2" sx={{ color: '#858585' }}>
+                {approval.status === 'pending'
+                    ? 'Waiting for a reviewer decision.'
+                    : `${approval.status === 'approved' ? 'Approved' : 'Rejected'}${reviewer ? ` by ${reviewer.name || reviewer.email}` : ''}${approval.decidedAt !== NONE_U64 ? ` on ${formatBigIntDateTime(approval.decidedAt)}` : ''}.`}
+            </Typography>
 
-                <AISectionCard eyebrow="Decision" title="Current state" description="What still needs to happen.">
-                    <Stack spacing={1}>
-                        <AIStatusPill label={approval.status} tone={approval.status === 'approved' ? 'success' : approval.status === 'rejected' ? 'danger' : 'warning'} />
-                        <Typography variant="body2" sx={{ color: '#858585', lineHeight: 1.7 }}>
-                            {approval.status === 'pending'
-                                ? 'This request is still waiting for a reviewer decision.'
-                                : `This request was ${approval.status}${reviewer ? ` by ${reviewer.name || reviewer.email}` : ''}.`}
-                        </Typography>
-                    </Stack>
-                </AISectionCard>
-
-                <AISectionCard eyebrow="Audit" title="Related activity" description="Activity records written for this approval.">
-                    <Stack spacing={1}>
-                        {relatedEvents.slice(0, 8).map((event) => (
-                            <Stack key={event.id.toString()} spacing={0.35}>
-                                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 600 }}>
-                                    {event.description}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#858585' }}>
-                                    {event.eventType} • {formatBigIntDateTime(event.createdAt)}
-                                </Typography>
+            {/* Related activity */}
+            {relatedEvents.length > 0 && (
+                <AISectionCard title="Related activity" description={`${relatedEvents.length} event${relatedEvents.length !== 1 ? 's' : ''}`}>
+                    <Stack spacing={0}>
+                        {relatedEvents.slice(0, 10).map((event, i) => (
+                            <Stack
+                                key={event.id.toString()}
+                                spacing={0.2}
+                                sx={{ py: 1, borderBottom: i < relatedEvents.length - 1 ? '1px solid #111' : 'none' }}
+                            >
+                                <Typography variant="body2" sx={{ color: '#fff', fontWeight: 500 }}>{event.description}</Typography>
+                                <Typography variant="caption" sx={{ color: '#555' }}>{event.eventType} • {formatBigIntDateTime(event.createdAt)}</Typography>
                             </Stack>
                         ))}
-                        {relatedEvents.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: '#858585' }}>
-                                No additional activity has been recorded for this approval yet.
-                            </Typography>
-                        ) : null}
                     </Stack>
                 </AISectionCard>
-            </AISectionGrid>
+            )}
         </AIWorkspacePage>
     );
 }

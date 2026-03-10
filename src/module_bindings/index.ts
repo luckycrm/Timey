@@ -34,6 +34,9 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddAiTaskAttachmentReducer from "./add_ai_task_attachment_reducer";
+import AddAiTaskCommentReducer from "./add_ai_task_comment_reducer";
+import AddAiTaskLabelReducer from "./add_ai_task_label_reducer";
 import AddChannelMemberReducer from "./add_channel_member_reducer";
 import AppendAiRunEventReducer from "./append_ai_run_event_reducer";
 import ApproveMeetingBookingReducer from "./approve_meeting_booking_reducer";
@@ -43,8 +46,11 @@ import CancelScheduledMeetingReducer from "./cancel_scheduled_meeting_reducer";
 import CreateAiAgentReducer from "./create_ai_agent_reducer";
 import CreateAiApprovalReducer from "./create_ai_approval_reducer";
 import CreateAiGoalReducer from "./create_ai_goal_reducer";
+import CreateAiLabelReducer from "./create_ai_label_reducer";
+import CreateAiLlmProviderReducer from "./create_ai_llm_provider_reducer";
 import CreateAiProjectReducer from "./create_ai_project_reducer";
 import CreateAiRunReducer from "./create_ai_run_reducer";
+import CreateAiSecretReducer from "./create_ai_secret_reducer";
 import CreateAiTaskReducer from "./create_ai_task_reducer";
 import CreateChannelReducer from "./create_channel_reducer";
 import CreateInviteReducer from "./create_invite_reducer";
@@ -54,6 +60,11 @@ import CreateMeetingFollowupTemplateReducer from "./create_meeting_followup_temp
 import CreateOrganizationReducer from "./create_organization_reducer";
 import CreateScheduledMeetingReducer from "./create_scheduled_meeting_reducer";
 import DecideAiApprovalReducer from "./decide_ai_approval_reducer";
+import DeleteAiLabelReducer from "./delete_ai_label_reducer";
+import DeleteAiLlmProviderReducer from "./delete_ai_llm_provider_reducer";
+import DeleteAiSecretReducer from "./delete_ai_secret_reducer";
+import DeleteAiTaskCommentReducer from "./delete_ai_task_comment_reducer";
+import EditAiTaskCommentReducer from "./edit_ai_task_comment_reducer";
 import EditMessageReducer from "./edit_message_reducer";
 import EndChannelCallReducer from "./end_channel_call_reducer";
 import EnqueueAiWakeupRequestReducer from "./enqueue_ai_wakeup_request_reducer";
@@ -70,12 +81,14 @@ import QueueMeetingReminderDeliveriesReducer from "./queue_meeting_reminder_deli
 import RecordAiAgentRuntimeHeartbeatReducer from "./record_ai_agent_runtime_heartbeat_reducer";
 import RegisterUserReducer from "./register_user_reducer";
 import RejectMeetingBookingReducer from "./reject_meeting_booking_reducer";
+import RemoveAiTaskLabelReducer from "./remove_ai_task_label_reducer";
 import RescheduleMeetingBookingReducer from "./reschedule_meeting_booking_reducer";
 import RescheduleMeetingBookingByTokenReducer from "./reschedule_meeting_booking_by_token_reducer";
 import RescheduleScheduledMeetingReducer from "./reschedule_scheduled_meeting_reducer";
 import RestoreAiAgentRuntimeRevisionReducer from "./restore_ai_agent_runtime_revision_reducer";
 import RestoreAiWorkspaceSettingsRevisionReducer from "./restore_ai_workspace_settings_revision_reducer";
 import SendMessageReducer from "./send_message_reducer";
+import SetDefaultAiLlmProviderReducer from "./set_default_ai_llm_provider_reducer";
 import SetMeetingAvailabilityRulesReducer from "./set_meeting_availability_rules_reducer";
 import SetMeetingRecordingPolicyReducer from "./set_meeting_recording_policy_reducer";
 import SetMeetingReminderTemplateReducer from "./set_meeting_reminder_template_reducer";
@@ -84,8 +97,10 @@ import StartChannelCallReducer from "./start_channel_call_reducer";
 import ToggleReactionReducer from "./toggle_reaction_reducer";
 import UpdateAiAgentStatusReducer from "./update_ai_agent_status_reducer";
 import UpdateAiGoalProgressReducer from "./update_ai_goal_progress_reducer";
+import UpdateAiLlmProviderReducer from "./update_ai_llm_provider_reducer";
 import UpdateAiProjectStatusReducer from "./update_ai_project_status_reducer";
 import UpdateAiRunStatusReducer from "./update_ai_run_status_reducer";
+import UpdateAiSecretReducer from "./update_ai_secret_reducer";
 import UpdateAiTaskStatusReducer from "./update_ai_task_status_reducer";
 import UpdateAiWakeupRequestStatusReducer from "./update_ai_wakeup_request_status_reducer";
 import UpdateMeetingEventTypeReducer from "./update_meeting_event_type_reducer";
@@ -106,10 +121,16 @@ import AiAgentRuntimeRow from "./ai_agent_runtime_table";
 import AiApprovalRow from "./ai_approval_table";
 import AiConfigRevisionRow from "./ai_config_revision_table";
 import AiGoalRow from "./ai_goal_table";
+import AiLabelRow from "./ai_label_table";
+import AiLlmProviderRow from "./ai_llm_provider_table";
 import AiProjectRow from "./ai_project_table";
 import AiRunRow from "./ai_run_table";
 import AiRunEventRow from "./ai_run_event_table";
+import AiSecretRow from "./ai_secret_table";
 import AiTaskRow from "./ai_task_table";
+import AiTaskAttachmentRow from "./ai_task_attachment_table";
+import AiTaskCommentRow from "./ai_task_comment_table";
+import AiTaskLabelRow from "./ai_task_label_table";
 import AiWakeupRequestRow from "./ai_wakeup_request_table";
 import AiWorkspaceSettingsRow from "./ai_workspace_settings_table";
 import ChatCallParticipantRow from "./chat_call_participant_table";
@@ -359,6 +380,34 @@ const tablesSchema = __schema({
       { name: 'ai_goal_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiGoalRow),
+  ai_label: __table({
+    name: 'ai_label',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_label_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiLabelRow),
+  ai_llm_provider: __table({
+    name: 'ai_llm_provider',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_llm_provider_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiLlmProviderRow),
   ai_project: __table({
     name: 'ai_project',
     indexes: [
@@ -437,6 +486,20 @@ const tablesSchema = __schema({
       { name: 'ai_run_event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiRunEventRow),
+  ai_secret: __table({
+    name: 'ai_secret',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'org_id', algorithm: 'btree', columns: [
+        'orgId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_secret_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiSecretRow),
   ai_task: __table({
     name: 'ai_task',
     indexes: [
@@ -475,6 +538,51 @@ const tablesSchema = __schema({
       { name: 'ai_task_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, AiTaskRow),
+  ai_task_attachment: __table({
+    name: 'ai_task_attachment',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_task_attachment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiTaskAttachmentRow),
+  ai_task_comment: __table({
+    name: 'ai_task_comment',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_task_comment_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiTaskCommentRow),
+  ai_task_label: __table({
+    name: 'ai_task_label',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'label_id', algorithm: 'btree', columns: [
+        'labelId',
+      ] },
+      { name: 'task_id', algorithm: 'btree', columns: [
+        'taskId',
+      ] },
+    ],
+    constraints: [
+      { name: 'ai_task_label_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AiTaskLabelRow),
   ai_wakeup_request: __table({
     name: 'ai_wakeup_request',
     indexes: [
@@ -1019,6 +1127,9 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("add_ai_task_attachment", AddAiTaskAttachmentReducer),
+  __reducerSchema("add_ai_task_comment", AddAiTaskCommentReducer),
+  __reducerSchema("add_ai_task_label", AddAiTaskLabelReducer),
   __reducerSchema("add_channel_member", AddChannelMemberReducer),
   __reducerSchema("append_ai_run_event", AppendAiRunEventReducer),
   __reducerSchema("approve_meeting_booking", ApproveMeetingBookingReducer),
@@ -1028,8 +1139,11 @@ const reducersSchema = __reducers(
   __reducerSchema("create_ai_agent", CreateAiAgentReducer),
   __reducerSchema("create_ai_approval", CreateAiApprovalReducer),
   __reducerSchema("create_ai_goal", CreateAiGoalReducer),
+  __reducerSchema("create_ai_label", CreateAiLabelReducer),
+  __reducerSchema("create_ai_llm_provider", CreateAiLlmProviderReducer),
   __reducerSchema("create_ai_project", CreateAiProjectReducer),
   __reducerSchema("create_ai_run", CreateAiRunReducer),
+  __reducerSchema("create_ai_secret", CreateAiSecretReducer),
   __reducerSchema("create_ai_task", CreateAiTaskReducer),
   __reducerSchema("create_channel", CreateChannelReducer),
   __reducerSchema("create_invite", CreateInviteReducer),
@@ -1039,6 +1153,11 @@ const reducersSchema = __reducers(
   __reducerSchema("create_organization", CreateOrganizationReducer),
   __reducerSchema("create_scheduled_meeting", CreateScheduledMeetingReducer),
   __reducerSchema("decide_ai_approval", DecideAiApprovalReducer),
+  __reducerSchema("delete_ai_label", DeleteAiLabelReducer),
+  __reducerSchema("delete_ai_llm_provider", DeleteAiLlmProviderReducer),
+  __reducerSchema("delete_ai_secret", DeleteAiSecretReducer),
+  __reducerSchema("delete_ai_task_comment", DeleteAiTaskCommentReducer),
+  __reducerSchema("edit_ai_task_comment", EditAiTaskCommentReducer),
   __reducerSchema("edit_message", EditMessageReducer),
   __reducerSchema("end_channel_call", EndChannelCallReducer),
   __reducerSchema("enqueue_ai_wakeup_request", EnqueueAiWakeupRequestReducer),
@@ -1055,12 +1174,14 @@ const reducersSchema = __reducers(
   __reducerSchema("record_ai_agent_runtime_heartbeat", RecordAiAgentRuntimeHeartbeatReducer),
   __reducerSchema("register_user", RegisterUserReducer),
   __reducerSchema("reject_meeting_booking", RejectMeetingBookingReducer),
+  __reducerSchema("remove_ai_task_label", RemoveAiTaskLabelReducer),
   __reducerSchema("reschedule_meeting_booking", RescheduleMeetingBookingReducer),
   __reducerSchema("reschedule_meeting_booking_by_token", RescheduleMeetingBookingByTokenReducer),
   __reducerSchema("reschedule_scheduled_meeting", RescheduleScheduledMeetingReducer),
   __reducerSchema("restore_ai_agent_runtime_revision", RestoreAiAgentRuntimeRevisionReducer),
   __reducerSchema("restore_ai_workspace_settings_revision", RestoreAiWorkspaceSettingsRevisionReducer),
   __reducerSchema("send_message", SendMessageReducer),
+  __reducerSchema("set_default_ai_llm_provider", SetDefaultAiLlmProviderReducer),
   __reducerSchema("set_meeting_availability_rules", SetMeetingAvailabilityRulesReducer),
   __reducerSchema("set_meeting_recording_policy", SetMeetingRecordingPolicyReducer),
   __reducerSchema("set_meeting_reminder_template", SetMeetingReminderTemplateReducer),
@@ -1069,8 +1190,10 @@ const reducersSchema = __reducers(
   __reducerSchema("toggle_reaction", ToggleReactionReducer),
   __reducerSchema("update_ai_agent_status", UpdateAiAgentStatusReducer),
   __reducerSchema("update_ai_goal_progress", UpdateAiGoalProgressReducer),
+  __reducerSchema("update_ai_llm_provider", UpdateAiLlmProviderReducer),
   __reducerSchema("update_ai_project_status", UpdateAiProjectStatusReducer),
   __reducerSchema("update_ai_run_status", UpdateAiRunStatusReducer),
+  __reducerSchema("update_ai_secret", UpdateAiSecretReducer),
   __reducerSchema("update_ai_task_status", UpdateAiTaskStatusReducer),
   __reducerSchema("update_ai_wakeup_request_status", UpdateAiWakeupRequestStatusReducer),
   __reducerSchema("update_meeting_event_type", UpdateMeetingEventTypeReducer),
