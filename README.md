@@ -10,56 +10,106 @@
 [![Bun](https://img.shields.io/badge/Runtime-Bun-black.svg)](https://bun.sh/)
 [![Contributors](https://img.shields.io/badge/Contributors-@luckycrm-ffb020.svg)](./CONTRIBUTORS.md)
 
-Timey is an open-source employee, project, and time management platform for modern teams.  
-It combines passwordless access, organization onboarding, member management, and real-time collaboration into one fast web app.
+Timey is an open-source employee, project, and time management platform for modern teams — now with a built-in **AI Workforce** control plane for managing autonomous agents, tasks, approvals, goals, and costs in real time.
 
-## What You Get
+---
+
+## AI Workforce — Highlights
+
+Timey ships a full operator-grade AI control plane under `/ai`. Every surface is backed by live SpacetimeDB subscriptions — no polling, no page refresh.
+
+### Agent Management
+- **Agent roster** with live runtime status (idle / running / paused / error)
+- **Agent detail** — runtime config, wakeup queue, adapter sessions, run history, event timeline
+- Create, configure, and toggle agents without leaving the workspace
+- Config revision history with one-click restore on `/ai/agents/:id`
+
+### Task Tracking
+- **Task board** with priority, status, assignee, labels, and due dates
+- **Task detail** — live execution widget showing active run, latest wakeup, adapter session, spend guardrail, and execution signals in one operator surface
+- File attachment support (link-based) — add URLs, filenames, and MIME types directly to tasks
+- Comment threads with edit and delete on individual task records
+- Label system with colour coding, apply/remove per task
+
+### Approvals
+- Pending/resolved/all tab views with inline approve and reject
+- **Approval detail** — action type, risk level, metadata payload viewer (key-value + raw JSON), links to originating task and agent
+- Approved/rejected confirmation banners with agent notification status
+
+### Goals & Projects
+- **Goal board** — outcome-grouped view with progress tracking, status, and linked tasks
+- **Goal detail** — delivery signals, linked task queue, agent staffing
+- **Project portfolio** — lane view by status with staffing, goal, task, and run rollups
+- **Project detail** — operator notes, recent runs, task queue, goal associations
+
+### Inbox & Activity
+- Operator inbox for pending approvals and wakeup requests requiring attention
+- Activity feed with event-level audit trail across agents, runs, and tasks
+
+### Costs
+- Date preset selectors (today / 7d / 30d / 90d)
+- Budget pressure indicator, spend trend chart
+- Agent spend ranking and project cost rollups
+
+### LLM Providers & Secrets
+- Register and manage LLM providers (OpenAI-compatible endpoints) with model ID, base URL, and API key
+- Set a default provider per workspace
+- Secrets vault — store and reference encrypted key-value secrets for agent tool use
+
+### Org View
+- Coverage and manager views for the full AI workforce
+- Member headcount, agent count, and activity rollups per org
+
+### Settings & Config
+- Workspace-level AI settings with readable config surface
+- Restoreable revision history — every settings save creates a diff-tracked revision
+
+### Scheduled Automation
+- 15-minute cron job (`process_reminder_cron`) runs as a SpacetimeDB scheduled reducer — queues meeting reminder deliveries automatically without any external worker or cron service
+
+---
+
+## Full Feature Set
 
 - Passwordless OTP authentication with server-side sessions
-- Workspace onboarding (create or join by workspace code)
+- Workspace onboarding — create or join by workspace code
 - Team membership and invite flows
-- Realtime collaboration powered by SpacetimeDB
-- Global time awareness for distributed teams
-- Clean TypeScript-first codebase ready for open-source contribution
+- Real-time team chat — threads, reactions, mentions, emoji picker, read state, presence
+- Global messenger panel available from any page, floating chat windows, floating thread view
+- Dyte video call integration — start/join calls from chat, in-app meeting dialog
+- Meetings manager — channel and public meeting scheduling with join-window enforcement
+- Full-screen calendar — date popup, in-place create/edit, conflict detection, drag reschedule, ICS export
+- Public booking pages at `/u/:handle` and `/u/:handle/:eventTypeSlug`
+- Booking approval workflow, slot conflict alternatives, guest manage links at `/booking/:token`
+- External guest invite links at `/meet/:inviteToken`
+- Meeting lifecycle emails via ZeptoMail — request, confirm, decline, reschedule, cancel, `.ics` attachments
+- Reminder templates with due-now bulk dispatch and failure tracking
+- Global radius tokens and consistent corner system across all surfaces
+- Online/offline presence via SpacetimeDB heartbeat
+- System notifications for incoming messages when away
+
+---
 
 ## Screenshots
 
 ![Login](./assets/login.png)
 
-## Product Direction
-
-Timey is built to become a full operating layer for:
-
-- Employee management
-- Project management
-- Time and coordination management
-
-Current release focuses on identity, workspace setup, members, invites, chat, and real-time foundations.  
-Project/task planning and deeper time tracking can be added on top of the existing schema and reducer model.
-
-## Current Page Map
-
-- `/chat` team chat, threads, reactions, presence, and call entry
-- `/meetings` meeting home and scheduling surface
-- `/meetings/calendar` full calendar management view
-- `/meetings/requests` host booking review and follow-up operations
-- `/meetings/activity` meeting activity and follow-up queue
-- `/meetings/settings` guided booking setup
-- `/u/:handle` public booking directory
-- `/u/:handle/:eventTypeSlug` public booking flow
-- `/booking/:token` guest join/manage page
-- `/meet/:inviteToken` external guest meeting join page
-- `/ai` AI workforce home
-- `/ai/agents`, `/ai/tasks`, `/ai/approvals`, `/ai/inbox`, `/ai/activity`, `/ai/projects`, `/ai/goals`, `/ai/costs`, `/ai/org`, `/ai/settings`
+---
 
 ## Tech Stack
 
-- Frontend: React 19 + TanStack Start + TanStack Router + React Query
-- UI: MUI
-- Backend runtime: TanStack Start server functions
-- Realtime data layer: SpacetimeDB
-- Auth: Email OTP + signed session cookie
-- Package manager/runtime: Bun
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 + TanStack Start + TanStack Router + React Query |
+| UI | MUI (Material UI) |
+| Realtime data | SpacetimeDB (maincloud) |
+| API server | Bun + Elysia |
+| Auth | Email OTP + signed session cookie |
+| Video | Dyte |
+| Email | ZeptoMail |
+| Package manager | Bun |
+
+---
 
 ## Quick Start
 
@@ -67,20 +117,36 @@ Project/task planning and deeper time tracking can be added on top of the existi
 
 ```bash
 bun install
+cd server && bun install && cd ..
 ```
 
 ### 2. Configure environment
 
-Create `.env.local`:
+Copy `.env.example` to `.env.local` and fill in your values:
 
 ```bash
-SESSION_SECRET=change-me
-ZEPTOMAIL_TOKEN=your-zeptomail-token
-VITE_SPACETIMEDB_HOST=https://maincloud.spacetimedb.com
+# SpacetimeDB
+SPACETIMEDB_DB_NAME=timeydb
+SPACETIMEDB_HOST=https://maincloud.spacetimedb.com
 VITE_SPACETIMEDB_DB_NAME=timeydb
+VITE_SPACETIMEDB_HOST=https://maincloud.spacetimedb.com
+
+# Session
+SESSION_SECRET=change-me-in-production
+
+# ZeptoMail (email)
+ZEPTOMAIL_TOKEN=your-zeptomail-token
+ZEPTOMAIL_URL=https://api.zeptomail.com/v1.1/email
+SENDER_EMAIL=noreply@yourdomain.com
+
+# Dyte (video calls)
 DYTE_ORG_ID=your-dyte-org-id
 DYTE_API_KEY=your-dyte-api-key
 DYTE_PRESET_NAME=group_call_host
+
+# Server / CORS
+VITE_ORIGIN=http://localhost:5173
+APP_URL=http://localhost:5173
 ```
 
 ### 3. Run locally
@@ -89,132 +155,129 @@ DYTE_PRESET_NAME=group_call_host
 bun run dev
 ```
 
-App runs at `http://localhost:5173`.
+This starts **both** Vite (frontend) and Elysia (API server) together via `concurrently`.
+App runs at `http://localhost:5173`. SpacetimeDB runs on maincloud — no local instance needed.
+
+---
+
+## Page Map
+
+### AI Workforce (`/ai`)
+| Route | Description |
+|---|---|
+| `/ai` | Operator cockpit — action queues, active agents, spend trend, project snapshot |
+| `/ai/agents` | Agent roster with live runtime status |
+| `/ai/agents/:id` | Agent detail — config, wakeups, runs, event timeline, revision history |
+| `/ai/tasks` | Task board with priority, status, labels, assignee |
+| `/ai/tasks/:id` | Task detail — live run widget, comments, attachments, labels |
+| `/ai/approvals` | Pending / resolved approval queue |
+| `/ai/approvals/:id` | Approval detail — payload viewer, risk level, agent/task links |
+| `/ai/inbox` | Operator inbox — pending items requiring attention |
+| `/ai/activity` | Activity feed — audit trail across agents, runs, tasks |
+| `/ai/projects` | Project portfolio in lane view |
+| `/ai/projects/:id` | Project detail — staffing, goals, task queue, run history |
+| `/ai/goals` | Outcome board grouped by status |
+| `/ai/goals/:id` | Goal detail — delivery signals, linked tasks |
+| `/ai/costs` | Spend analytics — trend, agent ranking, project rollups |
+| `/ai/org` | Coverage and manager views for AI workforce |
+| `/ai/settings` | Workspace AI config with restoreable revision history |
+| `/ai/llms` | LLM provider management — register, set default |
+| `/ai/secrets` | Secrets vault for agent tool credentials |
+
+### Chat & Communication
+| Route | Description |
+|---|---|
+| `/chat` | Team chat, threads, reactions, presence, video call entry |
+
+### Meetings
+| Route | Description |
+|---|---|
+| `/meetings` | Meeting home and scheduling surface |
+| `/meetings/calendar` | Full calendar management view |
+| `/meetings/requests` | Host booking review and follow-up |
+| `/meetings/activity` | Meeting activity and follow-up queue |
+| `/meetings/settings` | Guided booking setup — types, availability, reminders |
+| `/u/:handle` | Public booking directory |
+| `/u/:handle/:eventTypeSlug` | Public booking flow |
+| `/booking/:token` | Guest join/manage page |
+| `/meet/:inviteToken` | External guest meeting join |
+
+---
 
 ## SpacetimeDB Workflow
 
-When changing schema/reducers in `spacetimedb/src/index.ts`:
+When changing schema or reducers in `spacetimedb/src/index.ts`:
 
 ```bash
+# Publish module to maincloud
+bun run spacetime:publish
+
+# Regenerate TypeScript client bindings
 bun run spacetime:generate
 ```
 
-To publish module updates:
-
-```bash
-bun run spacetime:publish
-```
-
-To build the module directly:
-
-```bash
-bun --cwd spacetimedb run build
-```
+---
 
 ## Scripts
 
-- `bun run dev` start local dev server
-- `bun run build` build production assets
-- `bun run preview` preview production client build
-- `bun run start` run generated server output
-- `bun run spacetime:generate` regenerate client bindings
-- `bun run spacetime:publish` publish SpacetimeDB module
+| Command | Description |
+|---|---|
+| `bun run dev` | Start Vite + Elysia API together |
+| `bun run build` | Build production assets |
+| `bun run preview` | Preview production client build |
+| `bun run spacetime:generate` | Regenerate SpacetimeDB client bindings |
+| `bun run spacetime:publish` | Publish SpacetimeDB module to maincloud |
+
+---
 
 ## Project Structure
 
-```text
+```
 src/
-  components/       UI and feature components
-  hooks/            auth and data hooks
-  routes/           file-based app routes
-  server/           server functions (OTP, invites, sessions)
-  module_bindings/  generated SpacetimeDB bindings (do not edit)
+  components/
+    ai/             AI workforce pages and primitives
+  hooks/            Auth and data hooks
+  routes/           File-based app routes
+  module_bindings/  Generated SpacetimeDB bindings (do not edit)
+server/
+  routes/           Elysia API routes (auth, dyte, email, llm)
+  lib/              Session, email, SpacetimeDB helpers
 spacetimedb/
-  src/index.ts      schema + reducers
+  src/index.ts      Schema + all reducers
 ```
 
-## Open Source Roadmap
+---
 
-- [x] OTP auth and session lifecycle
-- [x] Organization onboarding and workspace joins
-- [x] Member invites and workspace membership
-- [x] Realtime team chat foundations
-- [x] Multi-timezone awareness primitives
-- [ ] Project entities, milestones, and ownership
-- [ ] Task boards and workflow states
-- [ ] Time entries, attendance, and reporting
-- [ ] Role-based permissions and audit trails
-
-## Implementation Status (March 8, 2026)
+## Implementation Status (March 2026)
 
 ### Done
 
-- Chat page supports threaded replies, reactions, message editing, mentions, emoji picker, and read-state sync.
-- Global right-side messenger panel is available outside `/chat`.
-- Messenger supports both direct messages and group channels.
-- Floating chat windows open from the messenger panel.
-- Maximum 2 floating chat windows are kept open; opening a third replaces the oldest open window.
-- Floating thread view now opens as a full thread screen in the same chat card with a top back button.
-- Online/offline presence is global (not only `/chat`) via SpacetimeDB heartbeat updates.
-- Topbar user profile shows live online/offline status.
-- Incoming message sound plays when user is away from active chat context.
-- System notifications for incoming messages work when user is away and notification permission is granted.
-- Message input and message list UI in floating chat are aligned with shared chat components.
-- Dyte video call integration is added to chat headers (start call -> open in-app Dyte meeting dialog).
-- Dyte server bridge is added (`src/server/dyte.ts`) to create meetings and participant auth tokens securely.
-- Call sessions are now chat-native via SpacetimeDB (`chat_call_session`, `chat_call_participant`) with active call discovery, join, leave, and end flows.
-- Meetings manager is live at `/meetings` with channel/public meeting scheduling and join-window enforcement.
-- Meetings manager is simplified around actual operations instead of placeholder panels.
-- Full-screen calendar view is redesigned as the primary calendar surface, with date popup workflows, in-place meeting creation/editing, conflict surfacing, drag rescheduling, and ICS export.
-- Meeting settings are redesigned into a guided setup flow for office users (booking page, booking types, weekly availability, reminders/follow-up).
-- Booking requests are moved to `/meetings/requests` as a dedicated host workflow page.
-- Meeting activity and follow-up are moved to `/meetings/activity` as a separate operational page.
-- Meetings manager, calendar, requests, activity, and settings now share a standard meetings UI shell and a consistent submenu/sidebar.
-- Public booking pages are available at `/u/:handle` and `/u/:handle/:eventTypeSlug`.
-- Public booking event pages are redesigned into a cleaner booking flow with calendar-first scheduling and separate details confirmation.
-- Booking approval workflow is live for event types with `requireApproval` (pending queue + approve/decline in `/meetings/requests`).
-- Public booking flow now suggests nearby alternative slots when conflict/availability errors occur.
-- Booking management links are live at `/booking/:token`, redesigned as a guest-facing page with join-first flow plus manage controls.
-- Public scheduled meetings now support true external guest invite links via `/meet/:inviteToken` instead of pointing outsiders into the workspace portal.
-- Host booking operations are now available on `/meetings/requests`, including approve/decline, start/join meeting, reminder email, reschedule, cancel, and guest manage-link actions.
-- Meeting lifecycle emails are sent via ZeptoMail for booking request/confirm/decline/reschedule/cancel and scheduled-meeting notices.
-- Confirmed/rescheduled notices include `.ics` calendar invite attachments.
-- Reminder templates can queue reminder deliveries in `/meetings/settings`, with due-now bulk dispatch, manual single-send, and failure tracking.
-- Direct reminder emails can also be sent from `/meetings/requests` for approved bookings.
-- Post-meeting follow-up nudges are available from `/meetings/activity` for ended bookings.
-- Global radius tokens are added and main chat/dashboard/meetings/public-booking surfaces are standardized to the same corner system.
-- AI workforce routes are live under `/ai` with native Timey navigation for agents, tasks, approvals, inbox, activity, projects, goals, costs, org, and settings.
-- AI home, inbox, activity, agents, and tasks are wired to live SpacetimeDB records instead of static placeholder cards.
-- AI runtime control-plane tables are added: `ai_agent_runtime`, `ai_wakeup_request`, `ai_run_event`, and `ai_adapter_session`.
-- Agent detail pages now expose runtime configuration, wakeup queueing, adapter sessions, run history, and run-event timelines backed by live reducers.
-- Task detail pages now expose wakeup queueing, operator run notes, adapter-session visibility, and detailed run-event timelines.
-- AI home is now a Paperclip-style operator cockpit with action queues, active agents, queue mix, spend trend, project snapshot, and recent control-plane activity.
-- AI config revision history is now live for agent runtime and workspace settings, with restore actions directly on `/ai/agents/:id` and `/ai/settings`.
-- Task detail now includes a dedicated live execution widget that consolidates the active run, latest wakeup, adapter session, spend guardrail, and current execution signals into one operator surface.
-- AI projects now use portfolio lanes and richer project detail pages with staffing, goals, task queue, recent runs, and operator notes.
-- AI goals now use an outcome board with grouped work and richer goal detail pages focused on delivery signals.
-- AI org now supports both coverage and manager views for the AI workforce.
-- AI costs now includes date presets, budget pressure, spend trends, agent spend ranking, and project cost rollups.
-- AI settings now use a readable control-plane configuration surface with restoreable revision history.
-- AI task detail now has a live run widget for current run state, recent runtime events, queue health, and adapter session state.
-- AI runtime and workspace settings now write restoreable config revisions via `ai_config_revision`, with restore actions available in agent detail and AI settings.
+- OTP auth, session lifecycle, workspace onboarding, member invites
+- Real-time team chat — threads, reactions, mentions, emoji picker, read state, presence, floating windows
+- Dyte video call integration — in-chat start/join, call sessions via SpacetimeDB
+- Meetings manager — scheduling, calendar, booking, public pages, guest links, lifecycle emails, ICS attachments
+- Reminder templates with due-now bulk dispatch and post-meeting follow-up nudges
+- **AI workforce control plane** — agents, tasks, approvals, inbox, activity, projects, goals, costs, org, settings
+- **AI runtime tables** — `ai_agent_runtime`, `ai_wakeup_request`, `ai_run_event`, `ai_adapter_session`
+- **AI task enhancements** — comments, labels, file attachments, live execution widget
+- **AI approval detail** — full payload viewer, risk display, action type, agent/task navigation
+- **AI config revision history** — every settings save tracked, one-click restore on agents and workspace settings
+- **LLM provider management** — register providers, set default, manage per workspace
+- **Secrets vault** — store and reference encrypted credentials for agent tool use
+- **15-minute scheduled cron** — `process_reminder_cron` SpacetimeDB scheduled reducer auto-queues meeting reminders
 
 ### To Do
 
-- Closed-tab/browser push notifications (requires Service Worker + Push API + backend Web Push).
-- Notification preferences UI (sound on/off, desktop notification toggle, channel-level controls).
-- Additional mobile refinements for floating messenger behavior.
-- More chat QA coverage for reconnect/offline/online transitions and multi-account switching.
-- Reminder automation worker so reminders send without opening settings.
-- External calendar sync (Google/Microsoft).
-- Enterprise reporting and compliance automation for meeting lifecycle.
-- End-to-end automated tests for public booking, guest join, and host request flows.
-- AI runtime execution worker / heartbeat loop so queued wakeups turn into real runs automatically.
-- Richer run-log streaming, config diff views, and task/agent-level restore previews to push the AI control plane closer to Paperclip.
-- AI table privacy hardening and export/reporting for multi-tenant production use.
-- Native Timey agent tools (research, proposals, outbound, decks) and optional external runtime adapters.
-- See the detailed meetings plan in [docs/meetings-roadmap.md](./docs/meetings-roadmap.md).
-- See the AI migration plan in [docs/ai-workforce-migration-plan.md](./docs/ai-workforce-migration-plan.md).
+- Closed-tab push notifications (Service Worker + Push API + backend Web Push)
+- Notification preferences UI (sound, desktop toggle, channel-level controls)
+- External calendar sync (Google / Microsoft)
+- AI runtime execution worker so queued wakeups turn into real agent runs
+- Richer run-log streaming, config diff views, and task/agent-level restore previews
+- AI table privacy hardening and export/reporting for multi-tenant production
+- Native Timey agent tools (research, proposals, outbound) and external runtime adapters
+- End-to-end tests for public booking, guest join, and host request flows
+
+---
 
 ## Contributors
 
@@ -230,31 +293,23 @@ Contributions are welcome.
 3. Commit with clear messages (`feat: ...`, `fix: ...`)
 4. Open a pull request with screenshots/notes when UI changes are included
 
-Generated files like `src/module_bindings/` and `src/routeTree.gen.ts` should not be manually edited.
+Generated files (`src/module_bindings/`, `src/routeTree.gen.ts`) must not be manually edited.
 
-Read:
-
+See also:
 - [Contributing Guide](./CONTRIBUTING.md)
-- [Contributors](./CONTRIBUTORS.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 - [Security Policy](./SECURITY.md)
-- [Support](./SUPPORT.md)
 - [Governance](./GOVERNANCE.md)
 
-Automated review:
+Automated review: CodeRabbit checks configured via [`.coderabbit.yaml`](./.coderabbit.yaml).
 
-- CodeRabbit checks are configured via [`.coderabbit.yaml`](./.coderabbit.yaml)
-- Install/enable the CodeRabbit GitHub App on this repository to activate PR checks
+---
 
 ## Security Notes
 
-- Keep secrets in `.env.local`
-- Never commit production keys
+- Keep all secrets in `.env.local` — never commit to source control
 - Rotate `SESSION_SECRET` and mail credentials regularly
-
-## Funding
-
-If this project helps your team, support ongoing development via GitHub Sponsors.
+- SpacetimeDB tables marked `public: true` are visible to all authenticated clients — scope accordingly
 
 ## License
 

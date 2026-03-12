@@ -1,7 +1,16 @@
 import { schema, table, t } from 'spacetimedb/server';
+import { ScheduleAt } from 'spacetimedb';
 
 const NONE_U64 = 18446744073709551615n;
 const SCHEDULED_JOIN_LEAD_MS = 10n * 60n * 1000n;
+
+// Shared RowBuilder for the reminder_cron_job scheduled table.
+// Defined here so both the table definition and the process_reminder_cron reducer
+// reference the EXACT same type object — SpacetimeDB requires this for scheduled reducers.
+const cronJobRow = t.row('ReminderCronJob', {
+  scheduledId: t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+});
 
 const spacetimedb = schema({
   user: table(
@@ -634,6 +643,13 @@ const spacetimedb = schema({
       created_at: t.timestamp(),
       updated_at: t.timestamp(),
     }
+  ),
+  // Scheduled table: runs process_reminder_cron every 15 minutes.
+  // cronJobRow is defined before the schema so both the table and the reducer share the
+  // same RowBuilder reference — required for SpacetimeDB to match the scheduled type.
+  reminder_cron_job: table(
+    { name: 'reminder_cron_job', scheduled: (() => process_reminder_cron) as () => any },
+    cronJobRow
   ),
 });
 export default spacetimedb;
@@ -1314,8 +1330,13 @@ function stringifyAiWorkspaceSettingsSnapshot(settings: any) {
   });
 }
 
-export const init = spacetimedb.init((_ctx) => {
-  // Called when the module is initially published
+export const init = spacetimedb.init((ctx) => {
+  // Schedule the first reminder cron job to run 1 minute after module init
+  const firstRunAt = ctx.timestamp.microsSinceUnixEpoch + 60n * 1_000_000n;
+  ctx.db.reminder_cron_job.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.time(firstRunAt),
+  });
 });
 // ... (onConnect/onDisconnect omitted for brevity)
 
@@ -5249,5 +5270,84 @@ export const setDefaultAiLlmProvider = spacetimedb.reducer(
     for (const row of ctx.db.ai_llm_provider.org_id.filter(org_id)) {
       ctx.db.ai_llm_provider.id.update({ ...row, is_default: row.id === provider_id, updated_at: ctx.timestamp });
     }
+  }
+);
+
+/**
+ * Scheduled reducer: runs every 15 minutes to queue pending meeting reminder deliveries.
+ * Iterates all orgs with active reminder templates and queues reminders within the next
+ * 15-minute window. Reschedules itself automatically after each run.
+ */
+export const process_reminder_cron = spacetimedb.reducer(
+  { arg: cronJobRow },
+  (ctx, _args) => {
+    const now = ctx.timestamp.microsSinceUnixEpoch / 1000n; // microseconds → milliseconds
+    const HORIZON_MIN = 15n;
+    const horizonEnd = now + HORIZON_MIN * 60n * 1000n;
+    const graceWindow = 5n * 60n * 1000n;
+
+    // Collect all active reminder templates
+    const activeTemplates: typeof ctx.db.meeting_reminder_template extends { iter(): Iterable<infer R> } ? R[] : never[] = [];
+    for (const template of ctx.db.meeting_reminder_template.iter()) {
+      if (template.is_active) activeTemplates.push(template as any);
+    }
+
+    if (activeTemplates.length > 0) {
+      for (const booking of ctx.db.meeting_booking.iter()) {
+        if (booking.status !== 'confirmed') continue;
+        if (booking.starts_at <= now - graceWindow) continue;
+
+        const eventType = ctx.db.meeting_event_type.id.find(booking.event_type_id);
+        if (!eventType) continue;
+
+        const orgTemplates = (activeTemplates as any[]).filter((t: any) =>
+          t.org_id === booking.org_id && (t.channel_scope === 'all' || true)
+        );
+        if (orgTemplates.length === 0) continue;
+
+        const template: any = orgTemplates.find((t: any) => t.is_default) ?? orgTemplates[0];
+        let offsets: bigint[] = [];
+        try { offsets = JSON.parse(template.offsets_json); } catch { offsets = [15n]; }
+
+        for (const offset of offsets) {
+          const offsetBig = BigInt(offset);
+          const triggerAt = booking.starts_at - offsetBig * 60n * 1000n;
+          if (triggerAt > horizonEnd) continue;
+          if (triggerAt + graceWindow < now) continue;
+
+          // Check for existing delivery
+          let alreadyQueued = false;
+          for (const delivery of ctx.db.meeting_reminder_delivery.iter()) {
+            if (delivery.booking_id === booking.id && delivery.template_id === template.id && delivery.offset_min === offsetBig) {
+              alreadyQueued = true;
+              break;
+            }
+          }
+          if (alreadyQueued) continue;
+
+          ctx.db.meeting_reminder_delivery.insert({
+            id: 0n,
+            org_id: booking.org_id,
+            booking_id: booking.id,
+            template_id: template.id,
+            offset_min: offsetBig,
+            trigger_at: triggerAt,
+            status: 'pending',
+            attempts: 0n,
+            last_error: '',
+            sent_at: NONE_U64,
+            created_at: now,
+            updated_at: now,
+          });
+        }
+      }
+    }
+
+    // Reschedule to run again in 15 minutes
+    const nextRunAt = ctx.timestamp.microsSinceUnixEpoch + 15n * 60n * 1_000_000n;
+    ctx.db.reminder_cron_job.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(nextRunAt),
+    });
   }
 );

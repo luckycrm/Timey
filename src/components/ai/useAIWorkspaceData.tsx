@@ -16,6 +16,7 @@ import type {
     AiRunEvent,
     AiSecret,
     AiTask,
+    AiTaskAttachment,
     AiTaskComment,
     AiTaskLabel,
     AiWakeupRequest,
@@ -68,6 +69,7 @@ export interface AIWorkspaceData {
     aiSecrets: AiSecret[];
     aiTaskComments: AiTaskComment[];
     aiTaskLabels: AiTaskLabel[];
+    aiTaskAttachments: AiTaskAttachment[];
     aiLlmProviders: AiLlmProvider[];
 }
 
@@ -116,6 +118,7 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
     const [allSecrets] = useSpacetimeDBQuery(aiQuery ? tables.ai_secret : 'skip');
     const [allTaskComments] = useSpacetimeDBQuery(aiQuery ? tables.ai_task_comment : 'skip');
     const [allTaskLabels] = useSpacetimeDBQuery(aiQuery ? tables.ai_task_label : 'skip');
+    const [allTaskAttachments] = useSpacetimeDBQuery(aiQuery ? tables.ai_task_attachment : 'skip');
     const [allLlmProviders] = useSpacetimeDBQuery(aiQuery ? tables.ai_llm_provider : 'skip');
 
     const currentOrganization = useMemo(
@@ -145,6 +148,7 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
     const aiLabels = useMemo(() => currentOrgId == null ? [] : allLabels.filter(r => r.orgId === currentOrgId), [allLabels, currentOrgId]);
     const aiSecrets = useMemo(() => currentOrgId == null ? [] : allSecrets.filter(r => r.orgId === currentOrgId), [allSecrets, currentOrgId]);
     const aiTaskComments = useMemo(() => currentOrgId == null ? [] : allTaskComments.filter(r => r.orgId === currentOrgId), [allTaskComments, currentOrgId]);
+    const aiTaskAttachments = useMemo(() => currentOrgId == null ? [] : allTaskAttachments.filter(r => r.orgId === currentOrgId), [allTaskAttachments, currentOrgId]);
     const aiLlmProviders = useMemo(() => currentOrgId == null ? [] : allLlmProviders.filter(r => r.orgId === currentOrgId), [allLlmProviders, currentOrgId]);
 
     const loading =
@@ -203,6 +207,7 @@ function useAIWorkspaceDataSource(enabled: boolean): AIWorkspaceData {
         aiSecrets,
         aiTaskComments,
         aiTaskLabels: allTaskLabels,
+        aiTaskAttachments,
         aiLlmProviders,
     };
 }

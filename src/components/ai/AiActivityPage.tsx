@@ -5,11 +5,20 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { AIWorkspacePage } from './AIPrimitives';
-import { formatRelativeTime } from './aiUtils';
+import { formatRelativeTime, NONE_U64 } from './aiUtils';
 import { humanizeRuntimeToken } from './AIRuntimeDetailBlocks';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 type FeedSource = 'all' | 'activity' | 'run_event';
+
+function inferEntityType(event: { agentId: bigint; taskId: bigint; projectId: bigint; goalId: bigint; approvalId: bigint }): string {
+    if (event.agentId !== 0n && event.agentId !== NONE_U64) return 'agent';
+    if (event.taskId !== 0n && event.taskId !== NONE_U64) return 'task';
+    if (event.approvalId !== 0n && event.approvalId !== NONE_U64) return 'approval';
+    if (event.projectId !== 0n && event.projectId !== NONE_U64) return 'project';
+    if (event.goalId !== 0n && event.goalId !== NONE_U64) return 'goal';
+    return 'system';
+}
 
 const SOURCE_TABS: { value: FeedSource; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -27,6 +36,7 @@ export function AIActivityPage() {
 
     const [tab, setTab] = useState<FeedSource>('all');
     const [levelFilter, setLevelFilter] = useState<string>('all');
+    const [entityFilter, setEntityFilter] = useState<string>('all');
 
     const now = Date.now();
 
@@ -41,6 +51,7 @@ export function AIActivityPage() {
             actorLabel: usersById.get(event.actorUserId)?.name || usersById.get(event.actorUserId)?.email || 'System',
             agentName: aiAgents.find((a) => a.id === event.agentId)?.name || '',
             level: '',
+            entityType: inferEntityType(event),
         }));
 
     const runEventRows = [...aiRunEvents]
@@ -54,6 +65,7 @@ export function AIActivityPage() {
             actorLabel: usersById.get(event.actorUserId)?.name || usersById.get(event.actorUserId)?.email || 'Runtime',
             agentName: aiAgents.find((a) => a.id === event.agentId)?.name || '',
             level: event.level,
+            entityType: 'agent',
         }));
 
     const combinedFeed = [...activityRows, ...runEventRows]
@@ -62,34 +74,54 @@ export function AIActivityPage() {
     const filtered = combinedFeed.filter((row) => {
         if (tab !== 'all' && row.source !== tab) return false;
         if (levelFilter !== 'all' && row.source === 'run_event' && row.level !== levelFilter) return false;
+        if (entityFilter !== 'all' && row.entityType !== entityFilter) return false;
         return true;
     });
 
     const levels = ['error', 'warning', 'info', 'debug'];
+    const entityTypes = [...new Set(activityRows.map((r) => r.entityType))].sort();
 
     return (
         <AIWorkspacePage page="activity">
             {/* Header */}
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
                     Activity
                 </Typography>
-                <TextField
-                    select
-                    size="small"
-                    value={levelFilter}
-                    onChange={(e) => setLevelFilter(e.target.value)}
-                    sx={{
-                        minWidth: 120,
-                        '& .MuiInputBase-root': { fontSize: '0.8rem', color: '#555', borderColor: '#1a1a1a' },
-                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a1a' },
-                    }}
-                >
-                    <MenuItem value="all">All levels</MenuItem>
-                    {levels.map((l) => (
-                        <MenuItem key={l} value={l}>{l}</MenuItem>
-                    ))}
-                </TextField>
+                <Stack direction="row" spacing={1}>
+                    <TextField
+                        select
+                        size="small"
+                        value={entityFilter}
+                        onChange={(e) => setEntityFilter(e.target.value)}
+                        sx={{
+                            minWidth: 110,
+                            '& .MuiInputBase-root': { fontSize: '0.8rem', color: '#555', borderColor: '#1a1a1a' },
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a1a' },
+                        }}
+                    >
+                        <MenuItem value="all">All types</MenuItem>
+                        {entityTypes.map((type) => (
+                            <MenuItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+                        ))}
+                    </TextField>
+                    <TextField
+                        select
+                        size="small"
+                        value={levelFilter}
+                        onChange={(e) => setLevelFilter(e.target.value)}
+                        sx={{
+                            minWidth: 120,
+                            '& .MuiInputBase-root': { fontSize: '0.8rem', color: '#555', borderColor: '#1a1a1a' },
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a1a' },
+                        }}
+                    >
+                        <MenuItem value="all">All levels</MenuItem>
+                        {levels.map((l) => (
+                            <MenuItem key={l} value={l}>{l}</MenuItem>
+                        ))}
+                    </TextField>
+                </Stack>
             </Stack>
 
             {/* Source tabs */}

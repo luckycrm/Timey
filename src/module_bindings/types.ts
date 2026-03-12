@@ -575,6 +575,12 @@ export const OrganizationMember = __t.object("OrganizationMember", {
 });
 export type OrganizationMember = __Infer<typeof OrganizationMember>;
 
+export const ReminderCronJob = __t.object("ReminderCronJob", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type ReminderCronJob = __Infer<typeof ReminderCronJob>;
+
 export const User = __t.object("User", {
   id: __t.u64(),
   identity: __t.identity(),

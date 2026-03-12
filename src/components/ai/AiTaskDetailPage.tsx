@@ -2,11 +2,19 @@ import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import AiPriorityIcon from './AiPriorityIcon';
 import AiStatusBadge from './AiStatusBadge';
 import AiCommentThread from './AiCommentThread';
@@ -56,6 +64,7 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
         aiLabels,
         aiTaskLabels,
         aiTaskComments,
+        aiTaskAttachments,
     } = useAIWorkspaceData();
 
     const updateAiTaskStatus = useReducer(reducers.updateAiTaskStatus);
@@ -70,6 +79,7 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
     const addAiTaskComment = useReducer(reducers.addAiTaskComment);
     const editAiTaskComment = useReducer(reducers.editAiTaskComment);
     const deleteAiTaskComment = useReducer(reducers.deleteAiTaskComment);
+    const addAiTaskAttachment = useReducer(reducers.addAiTaskAttachment);
     const { identity } = useSpacetimeDB();
 
     const task = parsedId == null ? null : aiTasks.find((row) => row.id === parsedId) ?? null;
@@ -119,6 +129,38 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
     });
     const [queueingWakeup, setQueueingWakeup] = useState(false);
     const [savingRunEvent, setSavingRunEvent] = useState(false);
+
+    // Attachment state
+    const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+    const [attachForm, setAttachForm] = useState({ filename: '', url: '', mimeType: '' });
+    const [attachSaving, setAttachSaving] = useState(false);
+
+    const taskAttachments = task
+        ? [...aiTaskAttachments]
+            .filter((a) => a.taskId === task.id)
+            .sort((a, b) => Number(b.createdAt.microsSinceUnixEpoch - a.createdAt.microsSinceUnixEpoch))
+        : [];
+
+    const handleAddAttachment = async () => {
+        if (!task || !currentOrgId || !attachForm.filename.trim() || !attachForm.url.trim()) return;
+        setAttachSaving(true);
+        try {
+            await addAiTaskAttachment({
+                taskId: task.id,
+                orgId: currentOrgId,
+                filename: attachForm.filename.trim(),
+                url: attachForm.url.trim(),
+                mimeType: attachForm.mimeType.trim() || 'application/octet-stream',
+                sizeBytes: 0n,
+            });
+            setAttachForm({ filename: '', url: '', mimeType: '' });
+            setAttachDialogOpen(false);
+        } catch {
+            // silently fail — toast will show from reducer error boundary
+        } finally {
+            setAttachSaving(false);
+        }
+    };
 
     // Labels UI state
     const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
@@ -736,6 +778,109 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
                     </Stack>
                 </Stack>
             </AISectionCard>
+
+            {/* ── Attachments ── */}
+            <AISectionCard
+                eyebrow="Files"
+                title="Attachments"
+                description={taskAttachments.length > 0 ? `${taskAttachments.length} file${taskAttachments.length !== 1 ? 's' : ''}` : 'Link external files and resources'}
+            >
+                <Stack spacing={1}>
+                    {taskAttachments.length > 0 && (
+                        <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
+                            {taskAttachments.map((att, i) => (
+                                <Stack
+                                    key={att.id.toString()}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={1.5}
+                                    sx={{
+                                        px: 2,
+                                        py: 1.25,
+                                        borderBottom: i < taskAttachments.length - 1 ? '1px solid #1a1a1a' : 'none',
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                    }}
+                                >
+                                    <InsertDriveFileOutlinedIcon sx={{ fontSize: 16, color: '#555', flexShrink: 0 }} />
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography
+                                            component="a"
+                                            href={att.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            variant="body2"
+                                            sx={{ color: '#7eb0ff', fontWeight: 500, textDecoration: 'none', '&:hover': { textDecoration: 'underline' }, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                        >
+                                            {att.filename}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#555' }}>
+                                            {att.mimeType || 'file'}
+                                            {att.sizeBytes > 0n ? ` • ${(Number(att.sizeBytes) / 1024).toFixed(1)} KB` : ''}
+                                        </Typography>
+                                    </Box>
+                                    <Tooltip title="Open in new tab">
+                                        <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex' }}>
+                                            <IconButton size="small" sx={{ color: '#555', '&:hover': { color: '#7eb0ff' } }}>
+                                                <AttachFileIcon sx={{ fontSize: 14 }} />
+                                            </IconButton>
+                                        </a>
+                                    </Tooltip>
+                                </Stack>
+                            ))}
+                        </Box>
+                    )}
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AttachFileIcon />}
+                        onClick={() => setAttachDialogOpen(true)}
+                        sx={{ textTransform: 'none', alignSelf: 'flex-start', fontSize: '0.78rem' }}
+                    >
+                        Add attachment
+                    </Button>
+                </Stack>
+            </AISectionCard>
+
+            {/* Attachment dialog */}
+            <Dialog open={attachDialogOpen} onClose={() => setAttachDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { bgcolor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 2 } }}>
+                <DialogTitle sx={{ color: '#fff' }}>Add attachment</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ mt: 0.5 }}>
+                        <TextField
+                            size="small"
+                            label="File name"
+                            required
+                            value={attachForm.filename}
+                            onChange={(e) => setAttachForm((f) => ({ ...f, filename: e.target.value }))}
+                            placeholder="e.g. design-spec.pdf"
+                            fullWidth
+                        />
+                        <TextField
+                            size="small"
+                            label="URL"
+                            required
+                            value={attachForm.url}
+                            onChange={(e) => setAttachForm((f) => ({ ...f, url: e.target.value }))}
+                            placeholder="https://..."
+                            fullWidth
+                        />
+                        <TextField
+                            size="small"
+                            label="MIME type (optional)"
+                            value={attachForm.mimeType}
+                            onChange={(e) => setAttachForm((f) => ({ ...f, mimeType: e.target.value }))}
+                            placeholder="e.g. application/pdf, image/png"
+                            fullWidth
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                    <Button variant="outlined" onClick={() => setAttachDialogOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+                    <Button variant="contained" disabled={attachSaving || !attachForm.filename.trim() || !attachForm.url.trim()} onClick={handleAddAttachment} sx={{ textTransform: 'none' }}>
+                        {attachSaving ? 'Saving…' : 'Attach'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* ── Comments ── */}
             <AISectionCard

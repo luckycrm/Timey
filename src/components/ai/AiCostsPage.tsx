@@ -162,31 +162,40 @@ export function AICostsPage() {
                 <Stack spacing={1}>
                     <Typography variant="caption" sx={{ color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>By agent</Typography>
                     <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1 }}>
-                        {byAgent.slice(0, 10).map((row, i) => (
-                            <Stack
-                                key={row.agent.id.toString()}
-                                direction="row"
-                                alignItems="center"
-                                justifyContent="space-between"
-                                sx={{
-                                    px: 2,
-                                    py: 1.25,
-                                    borderBottom: i < byAgent.length - 1 ? '1px solid #1a1a1a' : 'none',
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
-                                }}
-                            >
-                                <Stack spacing={0.15}>
-                                    <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{row.agent.name}</Typography>
-                                    <Typography variant="caption" sx={{ color: '#555' }}>{row.agent.role} • {row.runs.length} runs</Typography>
+                        {byAgent.slice(0, 10).map((row, i) => {
+                            const tokenIn = row.runs.reduce((s, r) => s + Number(r.tokenInput), 0);
+                            const tokenOut = row.runs.reduce((s, r) => s + Number(r.tokenOutput), 0);
+                            return (
+                                <Stack
+                                    key={row.agent.id.toString()}
+                                    direction="row"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    sx={{
+                                        px: 2,
+                                        py: 1.25,
+                                        borderBottom: i < byAgent.length - 1 ? '1px solid #1a1a1a' : 'none',
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                    }}
+                                >
+                                    <Stack spacing={0.15}>
+                                        <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{row.agent.name}</Typography>
+                                        <Typography variant="caption" sx={{ color: '#555' }}>{row.agent.role} • {row.runs.length} runs</Typography>
+                                        {(tokenIn > 0 || tokenOut > 0) && (
+                                            <Typography variant="caption" sx={{ color: '#444' }}>
+                                                in {tokenIn.toLocaleString()} / out {tokenOut.toLocaleString()} tok
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                    <Stack direction="row" spacing={1.5} alignItems="center">
+                                        {row.failed > 0 && (
+                                            <Typography variant="caption" sx={{ color: '#ef4444' }}>{row.failed} failed</Typography>
+                                        )}
+                                        <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{formatUsd(row.total)}</Typography>
+                                    </Stack>
                                 </Stack>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    {row.failed > 0 && (
-                                        <Typography variant="caption" sx={{ color: '#ef4444' }}>{row.failed} failed</Typography>
-                                    )}
-                                    <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{formatUsd(row.total)}</Typography>
-                                </Stack>
-                            </Stack>
-                        ))}
+                            );
+                        })}
                     </Box>
                 </Stack>
             )}

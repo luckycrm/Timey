@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { reducers } from '../../module_bindings';
 import { AIWorkspacePage } from './AIPrimitives';
 import { formatRelativeTime, NONE_U64 } from './aiUtils';
+import { humanizeRuntimeToken } from './AIRuntimeDetailBlocks';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 type ApprovalTab = 'pending' | 'resolved' | 'all';
@@ -166,7 +167,7 @@ export function AIApprovalsPage() {
                                     {approval.title}
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: '#555' }}>
-                                    {task?.title || 'No task linked'}
+                                    {approval.actionType ? humanizeRuntimeToken(approval.actionType) : (task?.title || 'No task linked')}
                                     {agent ? ` • ${agent.name}` : ''}
                                     {' • '}
                                     {approval.status === 'pending'
