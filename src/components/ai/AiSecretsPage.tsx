@@ -97,7 +97,7 @@ export function AiSecretsPage() {
                     '& .MuiAlert-icon': { color: '#ffc47b' },
                 }}
             >
-                Secret values are write-only. Once saved, they cannot be viewed or exported.
+                Secret values are stored in the workspace database and are visible to all workspace members. Do not store production credentials here — use a dedicated secrets manager (e.g. HashiCorp Vault, AWS Secrets Manager) and store only references.
             </Alert>
 
             <Stack direction="row" justifyContent="flex-end">

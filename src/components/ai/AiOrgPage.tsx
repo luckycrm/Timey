@@ -6,7 +6,7 @@ import { AIWorkspacePage, AIStatusPill } from './AIPrimitives';
 import { NONE_U64 } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
-type OrgView = 'departments' | 'managers';
+type OrgView = 'departments' | 'managers' | 'tree';
 
 function statusTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
     switch (status) {
@@ -74,36 +74,25 @@ export function AIOrgPage() {
                     Org
                 </Typography>
                 <Stack direction="row" spacing={0.75}>
-                    <button
-                        onClick={() => setView('departments')}
-                        style={{
-                            padding: '4px 10px',
-                            border: '1px solid',
-                            borderColor: view === 'departments' ? '#fff' : '#1a1a1a',
-                            borderRadius: 4,
-                            background: 'none',
-                            cursor: 'pointer',
-                            color: view === 'departments' ? '#fff' : '#555',
-                            fontSize: '0.75rem',
-                        }}
-                    >
-                        Departments
-                    </button>
-                    <button
-                        onClick={() => setView('managers')}
-                        style={{
-                            padding: '4px 10px',
-                            border: '1px solid',
-                            borderColor: view === 'managers' ? '#fff' : '#1a1a1a',
-                            borderRadius: 4,
-                            background: 'none',
-                            cursor: 'pointer',
-                            color: view === 'managers' ? '#fff' : '#555',
-                            fontSize: '0.75rem',
-                        }}
-                    >
-                        Managers
-                    </button>
+                    {(['departments', 'managers', 'tree'] as OrgView[]).map((v) => (
+                        <button
+                            key={v}
+                            onClick={() => setView(v)}
+                            style={{
+                                padding: '4px 10px',
+                                border: '1px solid',
+                                borderColor: view === v ? '#fff' : '#1a1a1a',
+                                borderRadius: 4,
+                                background: 'none',
+                                cursor: 'pointer',
+                                color: view === v ? '#fff' : '#555',
+                                fontSize: '0.75rem',
+                                textTransform: 'capitalize',
+                            }}
+                        >
+                            {v}
+                        </button>
+                    ))}
                 </Stack>
             </Stack>
 
@@ -148,6 +137,97 @@ export function AIOrgPage() {
                                     {group.attentionCount > 0 && <AIStatusPill label={`${group.attentionCount} flagged`} tone="danger" />}
                                 </Stack>
                             </Stack>
+                        ))}
+                    </Box>
+                )
+            )}
+
+            {/* Tree view */}
+            {view === 'tree' && (
+                aiAgents.length === 0 ? (
+                    <Box sx={{ py: 8, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ color: '#555' }}>No agents yet.</Typography>
+                    </Box>
+                ) : (
+                    <Box sx={{ border: '1px solid #1a1a1a', borderRadius: 1, overflow: 'hidden' }}>
+                        {/* Workspace root */}
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{ px: 2, py: 1.25, borderBottom: '1px solid #1a1a1a', bgcolor: 'rgba(255,255,255,0.03)' }}
+                        >
+                            <Typography variant="body2" sx={{ color: '#7eb0ff', fontWeight: 700, letterSpacing: '0.04em' }}>
+                                Workspace
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#555' }}>
+                                {aiAgents.length} total · {activeAgents.length} active
+                            </Typography>
+                        </Stack>
+
+                        {/* Departments as branches */}
+                        {departments.map((group, dIdx) => (
+                            <Box key={group.department}>
+                                {/* Department row */}
+                                <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    sx={{
+                                        pl: 3,
+                                        pr: 2,
+                                        py: 1,
+                                        borderBottom: '1px solid #111',
+                                        bgcolor: 'rgba(255,255,255,0.015)',
+                                        borderLeft: '2px solid #2a2a2a',
+                                        ml: 1,
+                                    }}
+                                >
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: group.activeCount > 0 ? '#38c872' : '#333' }} />
+                                        <Typography variant="body2" sx={{ color: '#c8c8c8', fontWeight: 600 }}>
+                                            {group.department}
+                                        </Typography>
+                                    </Stack>
+                                    <Typography variant="caption" sx={{ color: '#444' }}>
+                                        {group.agents.length} agent{group.agents.length !== 1 ? 's' : ''}
+                                    </Typography>
+                                </Stack>
+
+                                {/* Agents as leaves */}
+                                {group.agents.map((agent, aIdx) => {
+                                    const manager = agent.managerUserId !== NONE_U64 ? usersById.get(agent.managerUserId) : null;
+                                    const isLast = aIdx === group.agents.length - 1 && dIdx === departments.length - 1;
+                                    return (
+                                        <Stack
+                                            key={agent.id.toString()}
+                                            direction="row"
+                                            alignItems="center"
+                                            justifyContent="space-between"
+                                            sx={{
+                                                pl: 5,
+                                                pr: 2,
+                                                py: 0.9,
+                                                borderBottom: isLast ? 'none' : '1px solid #111',
+                                                borderLeft: '2px solid #1a1a1a',
+                                                ml: 2,
+                                                '&:hover': { bgcolor: 'rgba(255,255,255,0.018)' },
+                                            }}
+                                        >
+                                            <Stack spacing={0.1}>
+                                                <Typography variant="body2" sx={{ color: '#fff', fontWeight: 500 }}>
+                                                    {agent.name}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#444' }}>
+                                                    {agent.role}
+                                                    {manager ? ` · reports to ${manager.name || manager.email}` : ''}
+                                                </Typography>
+                                            </Stack>
+                                            <AIStatusPill label={agent.status} tone={statusTone(agent.status)} />
+                                        </Stack>
+                                    );
+                                })}
+                            </Box>
                         ))}
                     </Box>
                 )

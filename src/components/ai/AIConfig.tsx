@@ -12,11 +12,13 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PrecisionManufacturingOutlinedIcon from '@mui/icons-material/PrecisionManufacturingOutlined';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 
 export type AIPageKey =
     | 'home'
     | 'agents'
     | 'tasks'
+    | 'board'
     | 'approvals'
     | 'inbox'
     | 'activity'
@@ -57,6 +59,13 @@ export const aiPageDefinitions: AIPageDefinition[] = [
         eyebrow: 'Execution',
         description: 'Priority lanes, blockers, and human handoffs.',
         icon: ChecklistRoundedIcon,
+    },
+    {
+        key: 'board',
+        label: 'Board',
+        eyebrow: 'Dispatch',
+        description: 'Claim and dispatch queued tasks to agents.',
+        icon: DashboardOutlinedIcon,
     },
     {
         key: 'approvals',
@@ -118,7 +127,7 @@ export const aiPageDefinitions: AIPageDefinition[] = [
         key: 'secrets',
         label: 'Secrets',
         eyebrow: 'Security',
-        description: 'Encrypted API keys and tokens for agent use at runtime.',
+        description: 'API keys and credentials stored for agent use at runtime.',
         icon: LockOutlinedIcon,
     },
     {

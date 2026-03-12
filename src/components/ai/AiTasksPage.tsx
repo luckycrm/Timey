@@ -25,10 +25,11 @@ import { useAIWorkspaceData } from './useAIWorkspaceData';
 
 const priorityOptions = ['low', 'normal', 'high', 'urgent'] as const;
 
-type TaskTab = 'all' | 'open' | 'running' | 'blocked' | 'done';
+type TaskTab = 'all' | 'mine' | 'open' | 'running' | 'blocked' | 'done';
 
 const TABS: { value: TaskTab; label: string }[] = [
     { value: 'all', label: 'All' },
+    { value: 'mine', label: 'Mine' },
     { value: 'open', label: 'Open' },
     { value: 'running', label: 'Running' },
     { value: 'blocked', label: 'Blocked' },
@@ -38,6 +39,7 @@ const TABS: { value: TaskTab; label: string }[] = [
 export function AITasksPage() {
     const {
         currentOrgId,
+        currentUser,
         aiAdapterSessions,
         aiTasks,
         aiProjects,
@@ -98,16 +100,18 @@ export function AITasksPage() {
 
     const filteredTasks = useMemo(() => {
         return tasksWithContext.filter(({ task }) => {
+            if (tab === 'mine') return currentUser != null && task.createdByUserId === currentUser.id;
             if (tab === 'open') return !['completed', 'cancelled', 'failed'].includes(task.status);
             if (tab === 'running') return task.status === 'running';
             if (tab === 'blocked') return task.status === 'blocked' || task.status === 'failed' || task.status === 'waiting_approval';
             if (tab === 'done') return task.status === 'completed' || task.status === 'cancelled';
             return true;
         });
-    }, [tasksWithContext, tab]);
+    }, [currentUser, tasksWithContext, tab]);
 
     const tabCount = (t: TaskTab) => {
         if (t === 'all') return aiTasks.length;
+        if (t === 'mine') return currentUser == null ? 0 : aiTasks.filter((task) => task.createdByUserId === currentUser.id).length;
         if (t === 'open') return aiTasks.filter((task) => !['completed', 'cancelled', 'failed'].includes(task.status)).length;
         if (t === 'running') return aiTasks.filter((task) => task.status === 'running').length;
         if (t === 'blocked') return aiTasks.filter((task) => ['blocked', 'failed', 'waiting_approval'].includes(task.status)).length;

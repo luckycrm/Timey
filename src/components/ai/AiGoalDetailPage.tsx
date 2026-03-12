@@ -1,6 +1,14 @@
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import MenuItem from '@mui/material/MenuItem';
+import Slider from '@mui/material/Slider';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Link } from '@tanstack/react-router';
 import { useReducer } from 'spacetimedb/tanstack';
@@ -11,11 +19,17 @@ import { formatBigIntDateTime, formatRelativeTime, safeParseBigInt } from './aiU
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 import { AiGoalTree } from './AiGoalTree';
 
+const GOAL_STATUSES = ['on_track', 'watching', 'blocked', 'completed'] as const;
+
 export function AIGoalDetailPage({ goalId }: { goalId: string }) {
     const parsedId = safeParseBigInt(goalId);
     const { aiGoals, aiProjects, aiTasks, usersById } = useAIWorkspaceData();
 
     const updateAiGoalProgress = useReducer(reducers.updateAiGoalProgress);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [editProgress, setEditProgress] = useState(0);
+    const [editStatus, setEditStatus] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const goal = parsedId == null ? null : aiGoals.find((r) => r.id === parsedId) ?? null;
     const project = goal ? aiProjects.find((r) => r.id === goal.projectId) ?? null : null;
@@ -37,16 +51,27 @@ export function AIGoalDetailPage({ goalId }: { goalId: string }) {
     const blockedTasks = tasks.filter((t) => ['blocked', 'failed'].includes(t.status)).length;
     const runningTasks = tasks.filter((t) => t.status === 'running').length;
     const waitingTasks = tasks.filter((t) => t.status === 'waiting_approval').length;
-    const handleAdvance = async () => {
+
+    const handleOpenEdit = () => {
+        setEditProgress(Number(goal.progressPct));
+        setEditStatus(goal.status);
+        setEditDialogOpen(true);
+    };
+
+    const handleSaveProgress = async () => {
+        setSaving(true);
         try {
             await updateAiGoalProgress({
                 goalId: goal.id,
-                progressPct: BigInt(Math.min(100, Number(goal.progressPct) + 10)),
-                status: Number(goal.progressPct) + 10 >= 100 ? 'completed' : goal.status,
+                progressPct: BigInt(editProgress),
+                status: editStatus,
             });
             toast.success('Goal updated');
+            setEditDialogOpen(false);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to update goal');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -71,11 +96,9 @@ export function AIGoalDetailPage({ goalId }: { goalId: string }) {
                         {` • updated ${formatRelativeTime(goal.updatedAt)}`}
                     </Typography>
                 </Stack>
-                {goal.status !== 'completed' && (
-                    <Button variant="contained" size="small" sx={{ textTransform: 'none', flexShrink: 0 }} onClick={handleAdvance}>
-                        Advance +10%
-                    </Button>
-                )}
+                <Button variant="outlined" size="small" sx={{ textTransform: 'none', flexShrink: 0 }} onClick={handleOpenEdit}>
+                    Edit progress
+                </Button>
             </Stack>
 
             {/* Progress bar */}
@@ -141,6 +164,49 @@ export function AIGoalDetailPage({ goalId }: { goalId: string }) {
                     onProjectClick={(_id) => {}}
                 />
             </AISectionCard>
+
+            {/* Edit progress dialog */}
+            <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { bgcolor: '#111111', border: '1px solid #1a1a1a', borderRadius: '8px' } }}>
+                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>Edit goal progress</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        <Stack spacing={1}>
+                            <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="caption" sx={{ color: '#858585' }}>Progress</Typography>
+                                <Typography variant="caption" sx={{ color: '#fff', fontWeight: 600 }}>{editProgress}%</Typography>
+                            </Stack>
+                            <Slider
+                                value={editProgress}
+                                onChange={(_e, v) => setEditProgress(v as number)}
+                                min={0}
+                                max={100}
+                                step={5}
+                                marks
+                                valueLabelDisplay="auto"
+                                sx={{ color: '#7eb0ff' }}
+                            />
+                        </Stack>
+                        <TextField
+                            select
+                            size="small"
+                            label="Status"
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value)}
+                            fullWidth
+                        >
+                            {GOAL_STATUSES.map((s) => (
+                                <MenuItem key={s} value={s}>{s.replace('_', ' ')}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #1a1a1a' }}>
+                    <Button variant="text" onClick={() => setEditDialogOpen(false)} disabled={saving} sx={{ textTransform: 'none', color: '#555' }}>Cancel</Button>
+                    <Button variant="contained" disabled={saving} onClick={handleSaveProgress} sx={{ textTransform: 'none' }}>
+                        {saving ? 'Saving…' : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </AIWorkspacePage>
     );
 }

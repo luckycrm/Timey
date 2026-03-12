@@ -1,15 +1,31 @@
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Link } from '@tanstack/react-router';
+import { useReducer } from 'spacetimedb/tanstack';
+import { toast } from 'sonner';
+import { reducers } from '../../module_bindings';
 import { AISectionCard, AIStatusPill, AIWorkspacePage } from './AIPrimitives';
 import { formatBigIntDateTime, formatRelativeTime, safeParseBigInt } from './aiUtils';
 import { useAIWorkspaceData } from './useAIWorkspaceData';
 
+const PROJECT_STATUSES = ['planning', 'active', 'watching', 'completed', 'paused'] as const;
+
 export function AIProjectDetailPage({ projectId }: { projectId: string }) {
     const parsedId = safeParseBigInt(projectId);
     const { aiProjects, aiAgents, aiGoals, aiTasks, aiApprovals, usersById } = useAIWorkspaceData();
+    const updateAiProjectStatus = useReducer(reducers.updateAiProjectStatus);
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+    const [editStatus, setEditStatus] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const project = parsedId == null ? null : aiProjects.find((r) => r.id === parsedId) ?? null;
     const owner = project ? usersById.get(project.ownerUserId) ?? null : null;
@@ -39,6 +55,24 @@ export function AIProjectDetailPage({ projectId }: { projectId: string }) {
 
     const statusTone = project.status === 'active' ? 'success' : project.status === 'watching' ? 'warning' : 'neutral';
 
+    const handleOpenStatusDialog = () => {
+        setEditStatus(project.status);
+        setStatusDialogOpen(true);
+    };
+
+    const handleSaveStatus = async () => {
+        setSaving(true);
+        try {
+            await updateAiProjectStatus({ projectId: project.id, status: editStatus });
+            toast.success('Project status updated');
+            setStatusDialogOpen(false);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to update status');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <AIWorkspacePage page="projects">
             {/* Header */}
@@ -57,7 +91,36 @@ export function AIProjectDetailPage({ projectId }: { projectId: string }) {
                         {` • updated ${formatRelativeTime(project.updatedAt)}`}
                     </Typography>
                 </Stack>
+                <Button variant="outlined" size="small" onClick={handleOpenStatusDialog} sx={{ textTransform: 'none', flexShrink: 0 }}>
+                    Change status
+                </Button>
             </Stack>
+
+            {/* Status edit dialog */}
+            <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { bgcolor: '#111111', border: '1px solid #1a1a1a', borderRadius: '8px' } }}>
+                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>Change project status</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        select
+                        size="small"
+                        label="Status"
+                        value={editStatus}
+                        onChange={(e) => setEditStatus(e.target.value)}
+                        fullWidth
+                        sx={{ mt: 1 }}
+                    >
+                        {PROJECT_STATUSES.map((s) => (
+                            <MenuItem key={s} value={s}>{s}</MenuItem>
+                        ))}
+                    </TextField>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #1a1a1a' }}>
+                    <Button variant="text" onClick={() => setStatusDialogOpen(false)} disabled={saving} sx={{ textTransform: 'none', color: '#555' }}>Cancel</Button>
+                    <Button variant="contained" disabled={saving || editStatus === project.status} onClick={handleSaveStatus} sx={{ textTransform: 'none' }}>
+                        {saving ? 'Saving…' : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {project.summary && (
                 <Typography variant="body2" sx={{ color: '#858585' }}>{project.summary}</Typography>

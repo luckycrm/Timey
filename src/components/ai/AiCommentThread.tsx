@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -35,6 +35,44 @@ interface AiCommentThreadProps {
   };
   comments: AiTaskComment[];
   currentIdentityHex: string;
+}
+
+// Simple inline markdown renderer — no external deps needed.
+function renderMarkdown(text: string): React.ReactNode {
+  const lines = text.split('\n');
+  return lines.map((line, li) => {
+    const parts: React.ReactNode[] = [];
+    // Pattern: **bold**, *italic*, `code`, [text](url), bare http(s) URLs
+    const regex = /\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\)]+)\)|(https?:\/\/\S+)/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      if (m[1] !== undefined) {
+        parts.push(<strong key={`${li}-${m.index}`} style={{ color: '#ffffff' }}>{m[1]}</strong>);
+      } else if (m[2] !== undefined) {
+        parts.push(<em key={`${li}-${m.index}`}>{m[2]}</em>);
+      } else if (m[3] !== undefined) {
+        parts.push(
+          <code key={`${li}-${m.index}`} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 3, padding: '1px 5px', fontFamily: 'monospace', fontSize: '0.82em', color: '#b9d1ff' }}>
+            {m[3]}
+          </code>
+        );
+      } else if (m[4] !== undefined && m[5] !== undefined) {
+        parts.push(<a key={`${li}-${m.index}`} href={m[5]} target="_blank" rel="noopener noreferrer" style={{ color: '#7eb0ff' }}>{m[4]}</a>);
+      } else if (m[6] !== undefined) {
+        parts.push(<a key={`${li}-${m.index}`} href={m[6]} target="_blank" rel="noopener noreferrer" style={{ color: '#7eb0ff' }}>{m[6]}</a>);
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return (
+      <span key={li}>
+        {parts.length > 0 ? parts : '\u00A0'}
+        {li < lines.length - 1 && <br />}
+      </span>
+    );
+  });
 }
 
 function formatCommentTime(createdAt: bigint): string {
@@ -186,14 +224,14 @@ function CommentItem({ comment, isOwn, onEdit, onDelete }: CommentItemProps) {
           ) : (
             <Typography
               variant="body2"
+              component="div"
               sx={{
                 color: '#d5d5d5',
                 lineHeight: 1.65,
-                whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
               }}
             >
-              {comment.body}
+              {renderMarkdown(comment.body)}
             </Typography>
           )}
         </Box>

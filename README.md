@@ -25,10 +25,12 @@ Timey ships a full operator-grade AI control plane under `/ai`. Every surface is
 - Config revision history with one-click restore on `/ai/agents/:id`
 
 ### Task Tracking
-- **Task board** with priority, status, assignee, labels, and due dates
+- **Task board** — kanban and list views, filterable by status, priority, assignee, and "Mine" tab for the current user
+- **Board dispatch** (`/ai/board`) — dedicated queue surface for claiming and dispatching queued tasks to agents with rollback on failure
 - **Task detail** — live execution widget showing active run, latest wakeup, adapter session, spend guardrail, and execution signals in one operator surface
 - File attachment support (link-based) — add URLs, filenames, and MIME types directly to tasks
-- Comment threads with edit and delete on individual task records
+- Comment threads with markdown rendering (`**bold**`, `*italic*`, `` `code` ``, links), edit and delete for own comments
+- Comment authors resolved to display names via identity lookup
 - Label system with colour coding, apply/remove per task
 
 ### Approvals
@@ -38,9 +40,9 @@ Timey ships a full operator-grade AI control plane under `/ai`. Every surface is
 
 ### Goals & Projects
 - **Goal board** — outcome-grouped view with progress tracking, status, and linked tasks
-- **Goal detail** — delivery signals, linked task queue, agent staffing
+- **Goal detail** — progress slider (0–100, step 5) and status selector (`on_track / watching / blocked / completed`), linked task queue, goal tree
 - **Project portfolio** — lane view by status with staffing, goal, task, and run rollups
-- **Project detail** — operator notes, recent runs, task queue, goal associations
+- **Project detail** — inline status editor (`planning / active / watching / completed / paused`), staffing summary, goal associations, task queue
 
 ### Inbox & Activity
 - Operator inbox for pending approvals and wakeup requests requiring attention
@@ -57,7 +59,8 @@ Timey ships a full operator-grade AI control plane under `/ai`. Every surface is
 - Secrets vault — store and reference encrypted key-value secrets for agent tool use
 
 ### Org View
-- Coverage and manager views for the full AI workforce
+- Three views: departments, managers, and hierarchical tree (workspace → departments → agents)
+- Tree view shows manager attribution and live status for each agent
 - Member headcount, agent count, and activity rollups per org
 
 ### Settings & Config
@@ -168,18 +171,19 @@ App runs at `http://localhost:5173`. SpacetimeDB runs on maincloud — no local 
 | `/ai` | Operator cockpit — action queues, active agents, spend trend, project snapshot |
 | `/ai/agents` | Agent roster with live runtime status |
 | `/ai/agents/:id` | Agent detail — config, wakeups, runs, event timeline, revision history |
-| `/ai/tasks` | Task board with priority, status, labels, assignee |
-| `/ai/tasks/:id` | Task detail — live run widget, comments, attachments, labels |
+| `/ai/tasks` | Task board — kanban/list views, Mine tab, priority/status/assignee filters |
+| `/ai/tasks/:id` | Task detail — live run widget, markdown comments, attachments, labels |
+| `/ai/board` | Dispatch board — claim and send queued tasks to agents |
 | `/ai/approvals` | Pending / resolved approval queue |
 | `/ai/approvals/:id` | Approval detail — payload viewer, risk level, agent/task links |
 | `/ai/inbox` | Operator inbox — pending items requiring attention |
 | `/ai/activity` | Activity feed — audit trail across agents, runs, tasks |
 | `/ai/projects` | Project portfolio in lane view |
-| `/ai/projects/:id` | Project detail — staffing, goals, task queue, run history |
+| `/ai/projects/:id` | Project detail — inline status editor, staffing, goals, task queue |
 | `/ai/goals` | Outcome board grouped by status |
-| `/ai/goals/:id` | Goal detail — delivery signals, linked tasks |
+| `/ai/goals/:id` | Goal detail — progress slider, status editor, linked tasks, goal tree |
 | `/ai/costs` | Spend analytics — trend, agent ranking, project rollups |
-| `/ai/org` | Coverage and manager views for AI workforce |
+| `/ai/org` | Coverage, manager, and org-tree views for AI workforce |
 | `/ai/settings` | Workspace AI config with restoreable revision history |
 | `/ai/llms` | LLM provider management — register, set default |
 | `/ai/secrets` | Secrets vault for agent tool credentials |
@@ -259,11 +263,15 @@ spacetimedb/
 - Reminder templates with due-now bulk dispatch and post-meeting follow-up nudges
 - **AI workforce control plane** — agents, tasks, approvals, inbox, activity, projects, goals, costs, org, settings
 - **AI runtime tables** — `ai_agent_runtime`, `ai_wakeup_request`, `ai_run_event`, `ai_adapter_session`
-- **AI task enhancements** — comments, labels, file attachments, live execution widget
+- **AI task enhancements** — comments with markdown rendering and author name resolution, labels, file attachments, live execution widget
+- **Board dispatch** — `/ai/board` queue surface for claiming and dispatching tasks to agents with rollback
 - **AI approval detail** — full payload viewer, risk display, action type, agent/task navigation
 - **AI config revision history** — every settings save tracked, one-click restore on agents and workspace settings
 - **LLM provider management** — register providers, set default, manage per workspace
-- **Secrets vault** — store and reference encrypted credentials for agent tool use
+- **Secrets vault** — store and reference credentials for agent tool use (accurate scope warning shown)
+- **Goal progress editor** — slider (0–100) + status select on `/ai/goals/:id`, replaces placeholder button
+- **Project status editor** — inline status change dialog on `/ai/projects/:id`
+- **Org tree view** — hierarchical workspace → department → agent view with live status indicators
 - **15-minute scheduled cron** — `process_reminder_cron` SpacetimeDB scheduled reducer auto-queues meeting reminders
 
 ### To Do

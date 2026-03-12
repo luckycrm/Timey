@@ -65,6 +65,7 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
         aiTaskLabels,
         aiTaskComments,
         aiTaskAttachments,
+        users,
     } = useAIWorkspaceData();
 
     const updateAiTaskStatus = useReducer(reducers.updateAiTaskStatus);
@@ -899,14 +900,19 @@ export function AITaskDetailPage({ taskId }: { taskId: string }) {
                     }}
                     comments={aiTaskComments
                         .filter((c) => c.taskId === task.id && !c.isDeleted)
-                        .map((c) => ({
-                            id: c.id,
-                            taskId: c.taskId,
-                            authorIdentity: c.authorIdentity.toHexString(),
-                            body: c.body,
-                            createdAt: c.createdAt.microsSinceUnixEpoch,
-                            updatedAt: c.updatedAt.microsSinceUnixEpoch,
-                        }))}
+                        .map((c) => {
+                            const authorHex = c.authorIdentity.toHexString();
+                            const authorUser = users.find((u) => u.identity.toHexString() === authorHex);
+                            return {
+                                id: c.id,
+                                taskId: c.taskId,
+                                authorIdentity: authorHex,
+                                authorDisplayName: authorUser?.name || authorUser?.email || undefined,
+                                body: c.body,
+                                createdAt: c.createdAt.microsSinceUnixEpoch,
+                                updatedAt: c.updatedAt.microsSinceUnixEpoch,
+                            };
+                        })}
                     currentIdentityHex={identity?.toHexString() ?? ''}
                 />
             </AISectionCard>

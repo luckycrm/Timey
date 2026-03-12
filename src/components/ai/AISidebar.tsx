@@ -22,6 +22,7 @@ export function AISidebar({ active, signalCounts }: AISidebarProps) {
         home: '/ai',
         agents: '/ai/agents',
         tasks: '/ai/tasks',
+        board: '/ai/board',
         approvals: '/ai/approvals',
         inbox: '/ai/inbox',
         activity: '/ai/activity',
