@@ -10,6 +10,301 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AiActivity = __t.object("AiActivity", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  actorUserId: __t.u64(),
+  agentId: __t.u64(),
+  taskId: __t.u64(),
+  approvalId: __t.u64(),
+  projectId: __t.u64(),
+  goalId: __t.u64(),
+  runId: __t.u64(),
+  eventType: __t.string(),
+  description: __t.string(),
+  metadataJson: __t.string(),
+  createdAt: __t.u64(),
+});
+export type AiActivity = __Infer<typeof AiActivity>;
+
+export const AiAdapterSession = __t.object("AiAdapterSession", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  agentId: __t.u64(),
+  runId: __t.u64(),
+  adapterType: __t.string(),
+  externalSessionId: __t.string(),
+  status: __t.string(),
+  summary: __t.string(),
+  metadataJson: __t.string(),
+  lastSeenAt: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiAdapterSession = __Infer<typeof AiAdapterSession>;
+
+export const AiAgent = __t.object("AiAgent", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  ownerUserId: __t.u64(),
+  managerUserId: __t.u64(),
+  projectId: __t.u64(),
+  name: __t.string(),
+  role: __t.string(),
+  department: __t.string(),
+  description: __t.string(),
+  status: __t.string(),
+  autonomyMode: __t.string(),
+  approvalMode: __t.string(),
+  toolsJson: __t.string(),
+  scheduleJson: __t.string(),
+  dailyBudgetMicrousd: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiAgent = __Infer<typeof AiAgent>;
+
+export const AiAgentRuntime = __t.object("AiAgentRuntime", {
+  agentId: __t.u64(),
+  orgId: __t.u64(),
+  adapterType: __t.string(),
+  runtimeStatus: __t.string(),
+  baseUrl: __t.string(),
+  command: __t.string(),
+  cwd: __t.string(),
+  envJson: __t.string(),
+  configJson: __t.string(),
+  heartbeatPolicyJson: __t.string(),
+  wakePolicyJson: __t.string(),
+  lastHeartbeatAt: __t.u64(),
+  lastSuccessAt: __t.u64(),
+  lastFailureAt: __t.u64(),
+  lastError: __t.string(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiAgentRuntime = __Infer<typeof AiAgentRuntime>;
+
+export const AiApproval = __t.object("AiApproval", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  taskId: __t.u64(),
+  agentId: __t.u64(),
+  requesterUserId: __t.u64(),
+  reviewerUserId: __t.u64(),
+  title: __t.string(),
+  summary: __t.string(),
+  status: __t.string(),
+  riskLevel: __t.string(),
+  actionType: __t.string(),
+  metadataJson: __t.string(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+  decidedAt: __t.u64(),
+});
+export type AiApproval = __Infer<typeof AiApproval>;
+
+export const AiConfigRevision = __t.object("AiConfigRevision", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  actorUserId: __t.u64(),
+  scopeType: __t.string(),
+  scopeId: __t.u64(),
+  revisionLabel: __t.string(),
+  payloadJson: __t.string(),
+  metadataJson: __t.string(),
+  createdAt: __t.u64(),
+});
+export type AiConfigRevision = __Infer<typeof AiConfigRevision>;
+
+export const AiGoal = __t.object("AiGoal", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  ownerUserId: __t.u64(),
+  projectId: __t.u64(),
+  title: __t.string(),
+  description: __t.string(),
+  status: __t.string(),
+  progressPct: __t.u64(),
+  dueAt: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiGoal = __Infer<typeof AiGoal>;
+
+export const AiLabel = __t.object("AiLabel", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  color: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type AiLabel = __Infer<typeof AiLabel>;
+
+export const AiLlmProvider = __t.object("AiLlmProvider", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  providerType: __t.string(),
+  apiKeySecretId: __t.u64(),
+  baseUrl: __t.string(),
+  modelId: __t.string(),
+  isDefault: __t.bool(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type AiLlmProvider = __Infer<typeof AiLlmProvider>;
+
+export const AiProject = __t.object("AiProject", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  ownerUserId: __t.u64(),
+  name: __t.string(),
+  summary: __t.string(),
+  status: __t.string(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiProject = __Infer<typeof AiProject>;
+
+export const AiRun = __t.object("AiRun", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  taskId: __t.u64(),
+  agentId: __t.u64(),
+  status: __t.string(),
+  triggerType: __t.string(),
+  summary: __t.string(),
+  errorMessage: __t.string(),
+  tokenInput: __t.u64(),
+  tokenOutput: __t.u64(),
+  toolCalls: __t.u64(),
+  costMicrousd: __t.u64(),
+  startedAt: __t.u64(),
+  finishedAt: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiRun = __Infer<typeof AiRun>;
+
+export const AiRunEvent = __t.object("AiRunEvent", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  runId: __t.u64(),
+  agentId: __t.u64(),
+  taskId: __t.u64(),
+  actorUserId: __t.u64(),
+  eventType: __t.string(),
+  level: __t.string(),
+  message: __t.string(),
+  payloadJson: __t.string(),
+  createdAt: __t.u64(),
+});
+export type AiRunEvent = __Infer<typeof AiRunEvent>;
+
+export const AiSecret = __t.object("AiSecret", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  name: __t.string(),
+  description: __t.string(),
+  valueEncrypted: __t.string(),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  isDeleted: __t.bool(),
+});
+export type AiSecret = __Infer<typeof AiSecret>;
+
+export const AiTask = __t.object("AiTask", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  projectId: __t.u64(),
+  goalId: __t.u64(),
+  agentId: __t.u64(),
+  createdByUserId: __t.u64(),
+  title: __t.string(),
+  description: __t.string(),
+  status: __t.string(),
+  priority: __t.string(),
+  sourceType: __t.string(),
+  linkedEntityType: __t.string(),
+  linkedEntityId: __t.u64(),
+  dueAt: __t.u64(),
+  completedAt: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiTask = __Infer<typeof AiTask>;
+
+export const AiTaskAttachment = __t.object("AiTaskAttachment", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  orgId: __t.u64(),
+  uploaderIdentity: __t.identity(),
+  filename: __t.string(),
+  url: __t.string(),
+  mimeType: __t.string(),
+  sizeBytes: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type AiTaskAttachment = __Infer<typeof AiTaskAttachment>;
+
+export const AiTaskComment = __t.object("AiTaskComment", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  orgId: __t.u64(),
+  authorIdentity: __t.identity(),
+  body: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  isDeleted: __t.bool(),
+});
+export type AiTaskComment = __Infer<typeof AiTaskComment>;
+
+export const AiTaskLabel = __t.object("AiTaskLabel", {
+  id: __t.u64(),
+  taskId: __t.u64(),
+  labelId: __t.u64(),
+  addedAt: __t.timestamp(),
+});
+export type AiTaskLabel = __Infer<typeof AiTaskLabel>;
+
+export const AiWakeupRequest = __t.object("AiWakeupRequest", {
+  id: __t.u64(),
+  orgId: __t.u64(),
+  agentId: __t.u64(),
+  taskId: __t.u64(),
+  requestedByUserId: __t.u64(),
+  status: __t.string(),
+  source: __t.string(),
+  reason: __t.string(),
+  payloadJson: __t.string(),
+  runId: __t.u64(),
+  errorMessage: __t.string(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+  startedAt: __t.u64(),
+  finishedAt: __t.u64(),
+});
+export type AiWakeupRequest = __Infer<typeof AiWakeupRequest>;
+
+export const AiWorkspaceSettings = __t.object("AiWorkspaceSettings", {
+  orgId: __t.u64(),
+  createdByUserId: __t.u64(),
+  defaultModel: __t.string(),
+  autonomyPosture: __t.string(),
+  fallbackMode: __t.string(),
+  externalSendPolicy: __t.string(),
+  budgetChangePolicy: __t.string(),
+  internalNotesPolicy: __t.string(),
+  integrationsJson: __t.string(),
+  auditRetentionDays: __t.u64(),
+  maxRunCostMicrousd: __t.u64(),
+  createdAt: __t.u64(),
+  updatedAt: __t.u64(),
+});
+export type AiWorkspaceSettings = __Infer<typeof AiWorkspaceSettings>;
+
 export const ChatCallParticipant = __t.object("ChatCallParticipant", {
   id: __t.u64(),
   callSessionId: __t.u64(),
@@ -279,6 +574,12 @@ export const OrganizationMember = __t.object("OrganizationMember", {
   joinedAt: __t.u64(),
 });
 export type OrganizationMember = __Infer<typeof OrganizationMember>;
+
+export const ReminderCronJob = __t.object("ReminderCronJob", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type ReminderCronJob = __Infer<typeof ReminderCronJob>;
 
 export const User = __t.object("User", {
   id: __t.u64(),

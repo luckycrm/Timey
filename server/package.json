@@ -1,0 +1,12 @@
+{
+  "name": "timey-server",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "latest",
+    "elysia": "latest"
+  }
+}

@@ -1,88 +1,12 @@
-import { createServerFn } from '@tanstack/react-start';
-import { SendMailClient } from 'zeptomail';
-
-const ZEPTOMAIL_URL = process.env.ZEPTOMAIL_URL || 'https://api.zeptomail.com/v1.1/email';
-const SENDER_EMAIL = process.env.SENDER_EMAIL || 'noreply@timey.app';
-
-function getMailClient(): SendMailClient | null {
-  const token = process.env.ZEPTOMAIL_TOKEN;
-  if (!token) return null;
-  return new SendMailClient({
-    url: ZEPTOMAIL_URL,
-    token,
-  });
-}
-
 /**
- * Send an invitation email to a new employee.
+ * Invite emails — delegates to Elysia API server.
+ * Drop-in replacement for TanStack server functions.
  */
-export const sendInviteEmail = createServerFn({ method: 'POST' })
-  .handler(async (ctx) => {
-    const { email, orgName, token } = (ctx.data as any) as {
-      email: string;
-      orgName: string;
-      token: string;
-    };
+import { api } from '../lib/api';
 
-    if (!email || !email.includes('@')) {
-      return { success: false, error: 'Invalid email address' };
-    }
-
-    const mailClient = getMailClient();
-    if (!mailClient) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('ZEPTOMAIL_TOKEN is not configured; skipping invite email send in development.');
-        return { success: true, skippedEmail: true };
-      }
-      return { success: false, error: 'Email delivery is not configured. Please contact support.' };
-    }
-
-    try {
-      await mailClient.sendMail({
-        from: {
-          address: SENDER_EMAIL,
-          name: 'Timey',
-        },
-        to: [
-          {
-            email_address: {
-              address: email,
-              name: email.split('@')[0],
-            },
-          },
-        ],
-        subject: `You've been invited to join ${orgName} on Timey`,
-        htmlbody: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; border: 1px solid #eee; border-radius: 16px;">
-            <h2 style="color: #1a1a2e; margin-bottom: 16px;">You're invited!</h2>
-            <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
-              Hello! You've been invited to join the <strong>${orgName}</strong> workspace on Timey, our employee management and time tracking system.
-            </p>
-            <div style="background: #f8f8fa; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; border: 1px solid #f0f0f5;">
-              <p style="color: #666; font-size: 14px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Use this Workspace ID to join:</p>
-              <span style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #1a1a2e; font-family: monospace;">${token}</span>
-            </div>
-            <p style="color: #444; line-height: 1.6; margin-bottom: 32px;">
-              To get started, please log in to Timey and enter the Workspace ID above when prompted.
-            </p>
-            <div style="text-align: center;">
-              <a href="${process.env.APP_URL || 'http://localhost:5173'}/login" 
-                 style="background: #000; color: #fff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
-                Get Started
-              </a>
-            </div>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 32px 0;" />
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              Timey — Modern Employee Management & Time Tracking
-            </p>
-          </div>
-        `,
-      });
-
-      console.log(`Invitation email sent to ${email} for Org ${orgName}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to send invitation email:', error);
-      return { success: false, error: 'Failed to deliver email' };
-    }
-  });
+export async function sendInviteEmail(opts: { data: { email: string; orgName: string; token: string } }) {
+    return api<{ success: boolean; error?: string; skippedEmail?: boolean }>(
+        '/api/email/invite',
+        { body: opts.data },
+    );
+}
