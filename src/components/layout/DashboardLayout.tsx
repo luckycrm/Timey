@@ -1078,7 +1078,7 @@ export function DashboardLayout({ children, onLogout, orgName = 'boats', chatSid
                     icon={AutoAwesomeOutlinedIcon}
                     label="AI"
                     active={location.pathname.startsWith('/ai')}
-                    onClick={() => navigate({ to: '/' } as any)}
+                    onClick={() => navigate({ to: '/ai' } as any)}
                 />
                 <Box sx={{ mt: 'auto' }}>
                     <SideItem
