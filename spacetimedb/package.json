@@ -15,6 +15,6 @@
   "devDependencies": {
     "@types/object-inspect": "^1.13.0",
     "@types/statuses": "^2.0.6",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
